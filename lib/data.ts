@@ -1,3 +1,10 @@
+export interface ItineraryStep {
+  day: number
+  title: string
+  description: string
+  overnight?: boolean
+}
+
 export interface RoadTrip {
   id: string
   title: string
@@ -15,6 +22,8 @@ export interface RoadTrip {
     description: string
     image: string
   }[]
+  itinerary?: ItineraryStep[]
+  callToAction?: string
 }
 
 export const roadTrips: RoadTrip[] = [
@@ -28,26 +37,26 @@ export const roadTrips: RoadTrip[] = [
     budget: 1200,
     tags: ["Plage", "Luxe", "Gastronomie", "Culture"],
     description:
-      "Découvrez les joyaux de la Côte d'Azur lors d'un road trip inoubliable. De Nice à Saint-Tropez, en passant par Monaco et Cannes, profitez des plus belles plages de la Méditerranée, des villages perchés et d'une gastronomie d'exception.",
+      "Découvrez les joyaux de la Côte d'Azur lors d'un road trip inoubliable...",
     isPremium: false,
     bestSeason: "Été",
-    pointsOfInterest: [
+    pointsOfInterest: [/* ... */],
+    itinerary: [
       {
-        name: "Nice",
-        description: "Promenade des Anglais et vieille ville",
-        image: "/placeholder.svg?height=300&width=400",
+        day: 1,
+        title: "Arrivée à Nice",
+        description: "Flânez sur la Promenade des Anglais...",
       },
       {
-        name: "Monaco",
-        description: "Casino de Monte-Carlo et Grand Prix",
-        image: "/placeholder.svg?height=300&width=400",
+        day: 2,
+        title: "Découverte de Monaco",
+        description: "Casino de Monte-Carlo, jardin exotique...",
+        overnight: true,
       },
-      {
-        name: "Cannes",
-        description: "La Croisette et le Palais des Festivals",
-        image: "/placeholder.svg?height=300&width=400",
-      },
+      // ...
     ],
+    callToAction:
+      "🔓 Débloquez l'accès à l'itinéraire détaillé, la carte interactive et bien plus encore.",
   },
   {
     id: "route-66",
@@ -59,7 +68,7 @@ export const roadTrips: RoadTrip[] = [
     tags: ["Aventure", "Historique", "Désert", "Urbain"],
     description:
       "Parcourez la légendaire Route 66 de Chicago à Los Angeles. Traversez 8 États et découvrez l'Amérique authentique avec ses diners rétro, ses motels vintage et ses paysages à couper le souffle.",
-    isPremium: true,
+    isPremium: false,
     bestSeason: "Printemps",
     pointsOfInterest: [
       {

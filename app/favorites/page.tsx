@@ -1,100 +1,124 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { RoadtripService } from "@/services/roadtrip-service"
 import RoadTripCard from "@/components/road-trip-card"
-import { roadTrips } from "@/lib/data"
-import { Search, Heart } from "lucide-react"
+import { Heart, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import SearchFilters from "@/components/search-bar"
 
 export default function FavoritesPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [sortBy, setSortBy] = useState("recent")
+  const router = useRouter()
 
-  // For demo purposes, let's assume these are the user's favorites
-  // In a real app, this would come from a database or API
-  const favoriteIds = ["cote-azur", "toscane", "garden-route"]
-  const favorites = roadTrips.filter((trip) => favoriteIds.includes(trip.id))
+  const [favorites, setFavorites] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredFavorites = favorites.filter(
-    (trip) =>
-      trip.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trip.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trip.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase())),
-  )
+  // États pour les filtres
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCountry, setSelectedCountry] = useState("all")
+  const [selectedTag, setSelectedTag] = useState("all")
+  const [budgetRange, setBudgetRange] = useState("all")
+  const [durationRange, setDurationRange] = useState("all")
+  const [season, setSeason] = useState("all")
+  const [isPremium, setIsPremium] = useState("all")
 
-  const sortedFavorites = [...filteredFavorites].sort((a, b) => {
-    if (sortBy === "price-asc") return a.budget - b.budget
-    if (sortBy === "price-desc") return b.budget - a.budget
-    if (sortBy === "duration-asc") return a.duration - b.duration
-    if (sortBy === "duration-desc") return b.duration - a.duration
-    // Default: recent (no change in order)
-    return 0
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        setLoading(true)
+        const data = await RoadtripService.getFavoriteRoadtrips()
+        const favoriteTrips = Array.isArray(data.roadtrips) ? data.roadtrips : []
+        setFavorites(favoriteTrips.map((trip: any) => ({ ...trip, isFavorite: true })))
+      } catch (error) {
+        console.error("Erreur lors du chargement des favoris:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFavorites()
+  }, [])
+
+  const filtered = favorites.filter((trip) => {
+    const query = searchQuery.toLowerCase()
+    const amount = trip.budget?.amount || 0
+
+    return (
+      (!searchQuery || trip.title.toLowerCase().includes(query) || trip.country.toLowerCase().includes(query) || trip.tags?.some((tag: string) => tag.toLowerCase().includes(query))) &&
+      (selectedCountry === "all" || trip.country === selectedCountry) &&
+      (selectedTag === "all" || trip.tags?.includes(selectedTag)) &&
+      (budgetRange === "all" ||
+        (budgetRange === "low" && amount <= 500) ||
+        (budgetRange === "medium" && amount > 500 && amount <= 1000) ||
+        (budgetRange === "high" && amount > 1000)) &&
+      (durationRange === "all" ||
+        (durationRange === "short" && trip.duration <= 3) ||
+        (durationRange === "medium" && trip.duration > 3 && trip.duration <= 7) ||
+        (durationRange === "long" && trip.duration > 7)) &&
+      (season === "all" || trip.bestSeason?.toLowerCase() === season) &&
+      (isPremium === "all" || trip.isPremium === (isPremium === "true"))
+    )
   })
 
+  const allCountries = Array.from(new Set(favorites.map((t) => t.country)))
+  const allTags = Array.from(new Set(favorites.flatMap((t) => t.tags || [])))
+
   return (
-    <div className="container py-8">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Mes favoris</h1>
-          <p className="text-gray-600">Retrouvez tous vos road trips préférés au même endroit</p>
+    <div className="container py-10">
+      <h1 className="text-3xl font-bold mb-6">Mes favoris</h1>
+
+      <SearchFilters
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        selectedCountry={selectedCountry}
+        setSelectedCountry={setSelectedCountry}
+        durationRange={durationRange}
+        setDurationRange={setDurationRange}
+        budgetRange={budgetRange}
+        setBudgetRange={setBudgetRange}
+        season={season}
+        setSeason={setSeason}
+        selectedTag={selectedTag}
+        setSelectedTag={setSelectedTag}
+        isPremium={isPremium}
+        setIsPremium={setIsPremium}
+        allCountries={allCountries}
+        allTags={allTags}
+      />
+
+      {loading ? (
+        <div className="flex justify-center items-center h-40">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </div>
-
-      {favorites.length > 0 ? (
-        <>
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-              <Input
-                placeholder="Rechercher dans vos favoris..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Trier par" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Plus récents</SelectItem>
-                <SelectItem value="price-asc">Prix croissant</SelectItem>
-                <SelectItem value="price-desc">Prix décroissant</SelectItem>
-                <SelectItem value="duration-asc">Durée croissante</SelectItem>
-                <SelectItem value="duration-desc">Durée décroissante</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedFavorites.map((trip) => (
-              <RoadTripCard
-                key={trip.id}
-                id={trip.id}
-                title={trip.title}
-                image={trip.image}
-                country={trip.country}
-                region={trip.region}
-                duration={trip.duration}
-                budget={trip.budget}
-                tags={trip.tags}
-                isPremium={trip.isPremium}
-              />
-            ))}
-          </div>
-        </>
-      ) : (
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
             <Heart className="h-8 w-8 text-gray-400" />
           </div>
-          <h2 className="text-xl font-bold mb-2">Aucun favori pour le moment</h2>
+          <h2 className="text-xl font-bold mb-2">Aucun favori trouvé</h2>
           <p className="text-gray-600 mb-6 max-w-md mx-auto">
-            Explorez nos road trips et ajoutez-les à vos favoris pour les retrouver facilement ici.
+            Essayez d’élargir vos filtres ou explorez de nouveaux roadtrips.
           </p>
-          <Button className="bg-primary hover:bg-primary/90">Explorer les road trips</Button>
+          <Button onClick={() => router.push("/")}>Explorer les road trips</Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          {filtered.map((trip) => (
+            <RoadTripCard
+              key={trip._id}
+              id={trip._id}
+              title={trip.title}
+              image={trip.image}
+              country={trip.country}
+              region={trip.region}
+              duration={trip.duration}
+              budget={trip.budget?.amount || 0}
+              tags={trip.tags}
+              isPremium={trip.isPremium}
+              isFavorite={true}
+            />
+          ))}
         </div>
       )}
     </div>
