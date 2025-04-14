@@ -2,7 +2,7 @@
 
 import { AuthService } from "./auth-service";
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || "https://api.example.com";
+const API_GATEWAY_URL = process.env.AUTH_SERVICE_URL || "https://api.example.com";
 
 export const UserService = {
   /**
