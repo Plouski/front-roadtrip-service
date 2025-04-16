@@ -241,5 +241,15 @@ export const AuthService = {
     async isAdmin() {
         const user = await this.getProfile()
         return user?.role === 'admin'
+    },
+
+    async getAuthHeaders() {
+        const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+        return {
+            "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
+        };
     }
+
 };

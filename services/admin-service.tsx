@@ -1,5 +1,3 @@
-// services/admin-service.js
-
 import { AuthService } from "./auth-service";
 
 const API_GATEWAY_URL = process.env.NEXT_PUBLIC_DB_SERVICE_URL || "https://api.example.com";
@@ -52,112 +50,34 @@ export const AdminService = {
    * Récupère la liste des utilisateurs avec pagination et recherche
    */
   async getUsers(page = 1, limit = 10, search = "") {
-    try {
-      const token = AuthService.getAuthToken();
+    const headers = await AuthService.getAuthHeaders();
 
-      if (!token) {
-        throw new Error("Non authentifié");
-      }
+    const url = `${API_GATEWAY_URL}/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
 
-      const queryParams = new URLSearchParams({
-        page,
-        limit,
-        ...(search ? { search } : {})
-      }).toString();
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+    });
 
-      const response = await fetch(`${API_GATEWAY_URL}/users?${queryParams}`, {
-        // const response = await fetch(`${API_GATEWAY_URL}/users`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expirée, veuillez vous reconnecter");
-        } else if (response.status === 403) {
-          throw new Error("Vous n'avez pas les autorisations nécessaires");
-        }
-
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur lors de la récupération des utilisateurs");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur lors de la récupération des utilisateurs:", error);
-      // Pour faciliter le développement, retournons des données fictives
-      return {
-        users: [
-          {
-            id: "1",
-            firstName: "John",
-            lastName: "Doe",
-            email: "john.doe@example.com",
-            role: "admin",
-            isActive: true,
-            createdAt: "2024-01-15T10:30:00Z"
-          },
-          {
-            id: "2",
-            firstName: "Jane",
-            lastName: "Smith",
-            email: "jane.smith@example.com",
-            role: "user",
-            isActive: true,
-            createdAt: "2024-02-20T14:20:00Z"
-          },
-          {
-            id: "3",
-            firstName: "Michael",
-            lastName: "Johnson",
-            email: "michael.j@example.com",
-            role: "user",
-            isActive: false,
-            createdAt: "2024-03-05T09:15:00Z"
-          },
-          {
-            id: "4",
-            firstName: "Emily",
-            lastName: "Brown",
-            email: "emily.brown@example.com",
-            role: "user",
-            isActive: true,
-            createdAt: "2024-03-18T16:45:00Z"
-          },
-          {
-            id: "5",
-            firstName: "David",
-            lastName: "Wilson",
-            email: "david.w@example.com",
-            role: "user",
-            isActive: true,
-            createdAt: "2024-04-02T11:10:00Z"
-          }
-        ],
-        total: 248
-      };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Impossible de charger la liste des utilisateurs");
     }
+
+    return await response.json();
   },
 
   /**
    * Met à jour le statut d'un utilisateur (actif/inactif)
    */
-  async updateUserStatus(userId, isActive) {
+  async updateUserStatus(userId: string, isVerified: boolean) {
     try {
-      const token = AuthService.getAuthToken();
+      const headers = await AuthService.getAuthHeaders();
 
-      if (!token) {
-        throw new Error("Non authentifié");
-      }
-
-      const response = await fetch(`${API_GATEWAY_URL}/admin/users/${userId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ isActive })
+      const response = await fetch(`${API_GATEWAY_URL}/users/status/${userId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ isVerified })
       });
 
       if (!response.ok) {
@@ -174,46 +94,66 @@ export const AdminService = {
       return await response.json();
     } catch (error) {
       console.error("Erreur lors de la mise à jour du statut de l'utilisateur:", error);
-      // Pour faciliter le développement, simulons une réponse réussie
-      return { success: true };
+      throw error;
     }
   },
 
   /**
-   * Supprime un utilisateur
-   */
-  async deleteUser(userId) {
-    try {
-      const token = AuthService.getAuthToken();
+ * Récupérer un utilisateur par ID
+ */
+  async getUserById(userId: string) {
+    const headers = await AuthService.getAuthHeaders();
 
-      if (!token) {
-        throw new Error("Non authentifié");
-      }
+    const response = await fetch(`${API_GATEWAY_URL}/users/${userId}`, {
+      method: "GET",
+      headers,
+    });
 
-      const response = await fetch(`${API_GATEWAY_URL}/admin/users/${userId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expirée, veuillez vous reconnecter");
-        } else if (response.status === 403) {
-          throw new Error("Vous n'avez pas les autorisations nécessaires");
-        }
-
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur lors de la suppression de l'utilisateur");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur lors de la suppression de l'utilisateur:", error);
-      // Pour faciliter le développement, simulons une réponse réussie
-      return { success: true };
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Erreur lors de la récupération de l'utilisateur");
     }
+
+    return await response.json();
+  },
+
+  /**
+   * Mettre à jour un utilisateur
+   */
+  async updateUser(userId: string, userData: any) {
+    const headers = await AuthService.getAuthHeaders();
+
+    const response = await fetch(`${API_GATEWAY_URL}/users/${userId}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(userData), // envoie direct des champs à mettre à jour
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Erreur lors de la mise à jour de l'utilisateur");
+    }
+
+    return await response.json();
+  },
+
+  /**
+* Supprime un utilisateur
+*/
+  async deleteUser(userId: string) {
+    const headers = await AuthService.getAuthHeaders();
+
+    const response = await fetch(`${API_GATEWAY_URL}/users/${userId}`, {
+      method: "DELETE",
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Erreur lors de la suppression de l'utilisateur");
+    }
+
+    return await response.json();
   },
 
   /**
@@ -222,35 +162,35 @@ export const AdminService = {
   async getRoadtrips(page = 1, limit = 10, search = "") {
     try {
       const token = AuthService.getAuthToken();
-  
+
       if (!token) {
         throw new Error("Non authentifié");
       }
-  
+
       const queryParams = new URLSearchParams({
         page,
         limit,
         ...(search ? { search } : {}),
         adminView: "true" // <--- C’est ça qui débloque la récupération des roadtrips admin
-      }).toString();      
-  
+      }).toString();
+
       const response = await fetch(`${API_GATEWAY_URL}/roadtrips?${queryParams}`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
       });
-  
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Session expirée, veuillez vous reconnecter");
         } else if (response.status === 403) {
           throw new Error("Vous n'avez pas les autorisations nécessaires");
         }
-  
+
         const errorData = await response.json();
         throw new Error(errorData.message || "Erreur lors de la récupération des roadtrips");
       }
-  
+
       return await response.json();
     } catch (error) {
       console.error("Erreur lors de la récupération des roadtrips:", error);
@@ -259,7 +199,7 @@ export const AdminService = {
         total: 0
       };
     }
-  },  
+  },
 
   /**
      * Crée un nouveau roadtrip

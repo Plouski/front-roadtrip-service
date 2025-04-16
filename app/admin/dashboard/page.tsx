@@ -56,6 +56,7 @@ import {
   Plus
 } from "lucide-react"
 import RoadtripsListPage from "../roadtrip/page"
+import UsersListPage from "../user/page"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -463,157 +464,12 @@ export default function AdminDashboard() {
 
           {/* Onglet Utilisateurs */}
           <TabsContent value="users" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Gestion des utilisateurs</CardTitle>
-                <CardDescription>
-                  Gérez les comptes utilisateurs, activez/désactivez des comptes ou supprimez-les.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Rechercher un utilisateur..."
-                      className="pl-10"
-                      value={usersSearch}
-                      onChange={(e) => setUsersSearch(e.target.value)}
-                    />
-                  </div>
-                  <Button variant="outline">
-                    <Plus className="mr-2 h-4 w-4" /> Ajouter un utilisateur
-                  </Button>
-                </div>
-
-                {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Utilisateur</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Rôle</TableHead>
-                            <TableHead>Statut</TableHead>
-                            <TableHead>Date d'inscription</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {users.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
-                                Aucun utilisateur trouvé
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            users.map(user => (
-                              <TableRow key={user.id}>
-                                <TableCell>
-                                  <div className="font-medium">{user.firstName} {user.lastName}</div>
-                                </TableCell>
-                                <TableCell>{user.email}</TableCell>
-                                <TableCell>
-                                  <Badge variant={user.role === "admin" ? "default" : "outline"}>
-                                    {user.role === "admin" ? "Admin" : "Utilisateur"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={user.isVerified ? "success" : "secondary"}>
-                                    {user.isVerified ? "Actif" : "Inactif"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
-                                <TableCell className="text-right">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                      <DropdownMenuItem>
-                                        <Eye className="mr-2 h-4 w-4" /> Voir le profil
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem>
-                                        <Edit className="mr-2 h-4 w-4" /> Modifier
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={() => toggleUserStatus(user.id, user.isVerified)}
-                                        disabled={isProcessingUser}
-                                      >
-                                        {user.isVerified ? (
-                                          <>
-                                            <X className="mr-2 h-4 w-4" /> Désactiver
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Check className="mr-2 h-4 w-4" /> Activer
-                                          </>
-                                        )}
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        className="text-red-600"
-                                        onClick={() => setUserToDelete(user)}
-                                      >
-                                        <Trash className="mr-2 h-4 w-4" /> Supprimer
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    <Pagination className="mt-4">
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={() => setUsersPage(p => Math.max(1, p - 1))}
-                            disabled={usersPage === 1}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: Math.min(5, Math.ceil(usersTotal / 10)) }, (_, i) => {
-                          const page = i + 1
-                          return (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                isActive={page === usersPage}
-                                onClick={() => setUsersPage(page)}
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          )
-                        })}
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={() => setUsersPage(p => p + 1)}
-                            disabled={usersPage >= Math.ceil(usersTotal / 10)}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            <UsersListPage/>
           </TabsContent>
 
           {/* Onglet Roadtrips */}
           <TabsContent value="roadtrips" className="space-y-6">
-                      <RoadtripsListPage />
-
+            <RoadtripsListPage />
           </TabsContent>
 
           {/* Onglet Métriques */}
