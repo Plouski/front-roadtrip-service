@@ -89,7 +89,7 @@ export default function RoadtripsListPage() {
   useEffect(() => {
     const checkAdminAccess = async () => {
       try {
-        const userData = await AuthService.getUserData()
+        const userData = await AuthService.getProfile()
         const isAdminUser = userData?.role === "admin"
         
         setIsAdmin(isAdminUser)
