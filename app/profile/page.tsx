@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AlertMessage } from "@/components/ui/alert-message"
 import { AuthService } from "@/services/auth-service"
 import { UserService } from "@/services/user-service"
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -31,7 +31,7 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  
+
   // Formulaire de profil
   const [formData, setFormData] = useState({
     firstName: "",
@@ -39,33 +39,33 @@ export default function ProfilePage() {
     email: "",
     phoneNumber: ""
   })
-  
+
   // Formulaire de mot de passe
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: ""
   })
-  
+
   // Messages d'alerte
   const [alertMessage, setAlertMessage] = useState("")
   const [alertType, setAlertType] = useState(null)
-  
+
   // Charge les données de l'utilisateur
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         setIsLoading(true)
         const token = AuthService.getAuthToken()
-        
+
         if (!token) {
           router.push('/auth')
           return
         }
-        
-        const userData = await UserService.getProfile()
+
+        const userData = await AuthService.getProfile()
         setUser(userData)
-        
+
         // Pré-remplit le formulaire avec les données de l'utilisateur
         setFormData({
           firstName: userData.firstName || "",
@@ -73,14 +73,14 @@ export default function ProfilePage() {
           email: userData.email || "",
           phoneNumber: userData.phoneNumber || ""
         })
-        
+
         setIsLoading(false)
       } catch (error) {
         console.error("Erreur lors du chargement du profil:", error)
         setAlertMessage("Impossible de charger votre profil. Veuillez vous reconnecter.")
         setAlertType("error")
         setIsLoading(false)
-        
+
         // Redirige vers la page de connexion après un délai si erreur d'authentification
         setTimeout(() => {
           AuthService.logout()
@@ -88,10 +88,10 @@ export default function ProfilePage() {
         }, 2000)
       }
     }
-    
+
     fetchUserData()
   }, [router])
-  
+
   // Gère les changements dans le formulaire de profil
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -100,7 +100,7 @@ export default function ProfilePage() {
       [name]: value
     }))
   }
-  
+
   // Gère les changements dans le formulaire de mot de passe
   const handlePasswordChange = (e) => {
     const { name, value } = e.target
@@ -109,15 +109,15 @@ export default function ProfilePage() {
       [name]: value
     }))
   }
-  
+
   // Enregistre les modifications du profil
   const handleSaveProfile = async (e) => {
     e.preventDefault()
     setIsSaving(true)
     setAlertMessage("")
-    
+
     try {
-      const updatedUser = await UserService.updateProfile(formData)
+      const updatedUser = await AuthService.updateProfile(formData)
       setUser(updatedUser)
       setAlertMessage("Profil mis à jour avec succès")
       setAlertType("success")
@@ -129,34 +129,34 @@ export default function ProfilePage() {
       setIsSaving(false)
     }
   }
-  
+
   // Change le mot de passe
   const handleChangePassword = async (e) => {
     e.preventDefault()
-    
+
     // Vérification que les mots de passe correspondent
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setAlertMessage("Les mots de passe ne correspondent pas")
       setAlertType("error")
       return
     }
-    
+
     setIsChangingPassword(true)
     setAlertMessage("")
-    
+
     try {
-      await UserService.changePassword(
+      await AuthService.changePassword(
         passwordData.currentPassword,
         passwordData.newPassword
       )
-      
+
       // Réinitialiser le formulaire
       setPasswordData({
         currentPassword: "",
         newPassword: "",
         confirmPassword: ""
       })
-      
+
       setAlertMessage("Mot de passe modifié avec succès")
       setAlertType("success")
     } catch (error) {
@@ -167,18 +167,18 @@ export default function ProfilePage() {
       setIsChangingPassword(false)
     }
   }
-  
+
   // Supprime le compte
   const handleDeleteAccount = async () => {
     setIsDeleting(true)
-    
+
     try {
       await UserService.deleteAccount()
-      
+
       // Message de confirmation et déconnexion
       setAlertMessage("Votre compte a été supprimé")
       setAlertType("success")
-      
+
       // Déconnexion et redirection après un délai
       setTimeout(() => {
         AuthService.logout()
@@ -191,7 +191,7 @@ export default function ProfilePage() {
       setIsDeleting(false)
     }
   }
-  
+
   // Affiche un écran de chargement
   if (isLoading) {
     return (
@@ -203,7 +203,9 @@ export default function ProfilePage() {
       </div>
     )
   }
-  
+
+  const isOAuthUser = user?.authProvider && user.authProvider !== 'local'
+
   // Première lettre de chaque nom pour l'avatar
   const getInitials = () => {
     const first = formData.firstName?.charAt(0) || '?'
@@ -213,14 +215,15 @@ export default function ProfilePage() {
 
   return (
     <div className="container py-10 max-w-4xl">
+
       <h1 className="text-3xl font-bold mb-6">Mon Profil</h1>
-      
+
       {alertMessage && (
         <div className="mb-6">
           <AlertMessage message={alertMessage} type={alertType} />
         </div>
       )}
-      
+
       <div className="grid grid-cols-1 md:grid-cols-[1fr_3fr] gap-6">
         {/* Sidebar avec avatar et informations de base */}
         <div className="space-y-6">
@@ -238,7 +241,7 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
-          
+
           {/* Informations du compte */}
           <Card>
             <CardHeader>
@@ -260,7 +263,7 @@ export default function ProfilePage() {
               </dl>
             </CardContent>
           </Card>
-          
+
           {/* Bouton de suppression de compte */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -279,7 +282,7 @@ export default function ProfilePage() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   onClick={handleDeleteAccount}
                   disabled={isDeleting}
                   className="bg-red-500 text-white hover:bg-red-600"
@@ -290,7 +293,7 @@ export default function ProfilePage() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-        
+
         {/* Sections principales */}
         <div>
           <Tabs defaultValue="profile">
@@ -299,12 +302,15 @@ export default function ProfilePage() {
                 <User className="mr-2 h-4 w-4" />
                 Informations personnelles
               </TabsTrigger>
-              <TabsTrigger value="password" className="flex items-center">
-                <Key className="mr-2 h-4 w-4" />
-                Changer de mot de passe
-              </TabsTrigger>
+              {!isOAuthUser && (
+                <TabsTrigger value="password" className="flex items-center">
+                  <Key className="mr-2 h-4 w-4" />
+                  Changer de mot de passe
+                </TabsTrigger>
+              )}
+
             </TabsList>
-            
+
             {/* Onglet informations personnelles */}
             <TabsContent value="profile">
               <Card>
@@ -338,7 +344,7 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input
@@ -354,7 +360,7 @@ export default function ProfilePage() {
                         L'email ne peut pas être modifié. Contactez le support pour changer d'adresse email.
                       </p>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="phoneNumber">Téléphone (optionnel)</Label>
                       <Input
@@ -374,65 +380,67 @@ export default function ProfilePage() {
                 </form>
               </Card>
             </TabsContent>
-            
+
             {/* Onglet changement de mot de passe */}
-            <TabsContent value="password">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Changer de mot de passe</CardTitle>
-                  <CardDescription>
-                    Assurez-vous que votre nouveau mot de passe est suffisamment fort et différent des précédents.
-                  </CardDescription>
-                </CardHeader>
-                <form onSubmit={handleChangePassword}>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Mot de passe actuel</Label>
-                      <Input
-                        id="currentPassword"
-                        name="currentPassword"
-                        type="password"
-                        value={passwordData.currentPassword}
-                        onChange={handlePasswordChange}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">Nouveau mot de passe</Label>
-                      <Input
-                        id="newPassword"
-                        name="newPassword"
-                        type="password"
-                        value={passwordData.newPassword}
-                        onChange={handlePasswordChange}
-                        required
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Minimum 8 caractères, incluant au moins une lettre majuscule, une lettre minuscule et un chiffre.
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
-                      <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        value={passwordData.confirmPassword}
-                        onChange={handlePasswordChange}
-                        required
-                      />
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button type="submit" disabled={isChangingPassword}>
-                      {isChangingPassword ? "Modification..." : "Changer le mot de passe"}
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Card>
-            </TabsContent>
+            {!isOAuthUser && (
+              <TabsContent value="password">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Changer de mot de passe</CardTitle>
+                    <CardDescription>
+                      Assurez-vous que votre nouveau mot de passe est suffisamment fort et différent des précédents.
+                    </CardDescription>
+                  </CardHeader>
+                  <form onSubmit={handleChangePassword}>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="currentPassword">Mot de passe actuel</Label>
+                        <Input
+                          id="currentPassword"
+                          name="currentPassword"
+                          type="password"
+                          value={passwordData.currentPassword}
+                          onChange={handlePasswordChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="newPassword">Nouveau mot de passe</Label>
+                        <Input
+                          id="newPassword"
+                          name="newPassword"
+                          type="password"
+                          value={passwordData.newPassword}
+                          onChange={handlePasswordChange}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Minimum 8 caractères, incluant au moins une lettre majuscule, une lettre minuscule et un chiffre.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                        <Input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          value={passwordData.confirmPassword}
+                          onChange={handlePasswordChange}
+                          required
+                        />
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button type="submit" disabled={isChangingPassword}>
+                        {isChangingPassword ? "Modification..." : "Changer le mot de passe"}
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>

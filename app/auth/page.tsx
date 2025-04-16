@@ -28,7 +28,7 @@ export default function AuthPage() {
     const checkAuth = async () => {
       const isAuthenticated = await AuthService.checkAuthentication();
       if (isAuthenticated) {
-        router.push('/dashboard');
+        router.push('/');
       }
     };
     
