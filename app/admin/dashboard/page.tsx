@@ -372,24 +372,6 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium">Engagement</CardTitle>
-                  <CardDescription>Likes et commentaires</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    <div className="text-3xl font-bold">{stats.totalLikes}</div>
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700">
-                      {stats.totalComments} commentaires
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {stats.totalRoadtrips ? Math.round((stats.totalLikes / stats.totalRoadtrips) * 10) / 10 : 0} likes par roadtrip
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
