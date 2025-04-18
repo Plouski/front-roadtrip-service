@@ -347,6 +347,26 @@ export default function CreateRoadTrip() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+              <div className="space-y-1">
+                  <Label>Image principale</Label>
+                  <div className="border rounded-md p-4">
+                    <div className="aspect-video bg-muted rounded-md overflow-hidden">
+                      <img
+                        src={roadtrip.image}
+                        alt="Image principale du roadtrip"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full"
+                      onClick={() => handleImageUpload("main")}
+                    >
+                      <ImagePlus className="mr-2 h-4 w-4" />
+                      Choisir une image
+                    </Button>
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label htmlFor="title">Titre du roadtrip <span className="text-red-500">*</span></Label>
                   <Input
@@ -387,27 +407,6 @@ export default function CreateRoadTrip() {
                     rows={5}
                     required
                   />
-                </div>
-
-                <div className="space-y-1">
-                  <Label>Image principale</Label>
-                  <div className="border rounded-md p-4">
-                    <div className="aspect-video bg-muted rounded-md overflow-hidden">
-                      <img
-                        src={roadtrip.image}
-                        alt="Image principale du roadtrip"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full"
-                      onClick={() => handleImageUpload("main")}
-                    >
-                      <ImagePlus className="mr-2 h-4 w-4" />
-                      Choisir une image
-                    </Button>
-                  </div>
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end">

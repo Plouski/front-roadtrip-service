@@ -449,7 +449,7 @@ export default function EditRoadTripPage() {
       <div className="flex flex-col gap-6 max-w-4xl mx-auto">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Modifier le Roadtrip</h1>
-          <Button variant="outline" onClick={() => router.push('/dashboard')}>
+          <Button variant="outline" onClick={() => router.push('/admin/dashboard')}>
             Annuler
           </Button>
         </div>

@@ -9,7 +9,6 @@ import { AdminService } from "@/services/admin-service"
 import LoginPromptModal from "@/components/ui/login-prompt-modal"
 import jsPDF from "jspdf"
 
-// Importation des composants modulaires
 import {
   RoadTripHero,
   RoadTripItinerary,
@@ -47,11 +46,9 @@ export default function RoadTripPage() {
       setError(null)
 
       try {
-        // Récupérer le rôle de l'utilisateur
         const role = getUserRole() || "visitor"
         setUserRole(role)
 
-        // Charger les données du roadtrip
         const trip = await RoadtripService.getRoadtripById(id)
         setRoadTrip(trip)
 
@@ -61,12 +58,10 @@ export default function RoadTripPage() {
           console.error("Erreur lors de l'enregistrement de la vue:", err)
         }
 
-        // L'API nous informe si l'utilisateur peut accéder au contenu premium
         if (trip.userAccess) {
           setCanAccessPremium(trip.userAccess.canAccessPremium || role === 'admin')
           setFavorite(trip.userAccess.isFavorite || false)
         } else {
-          // Fallback si userAccess n'est pas fourni
           setCanAccessPremium(role === 'admin' || role === 'premium')
         }
       } catch (error: any) {
@@ -91,7 +86,6 @@ export default function RoadTripPage() {
     }
 
     setFavorite(!favorite)
-    // Ici vous pouvez appeler votre API pour sauvegarder l'état des favoris
   }
 
   const handleDelete = async () => {
@@ -161,23 +155,14 @@ export default function RoadTripPage() {
     doc.save(`${roadTrip.title.replace(/\s+/g, "-").toLowerCase()}.pdf`)
   }
 
-  if (isLoading) {
-    return <LoadingState />
-  }
-
-  if (error) {
-    return <ErrorState error={error} />
-  }
-
-  if (!roadTrip) {
-    return <NotFoundState />
-  }
+  if (isLoading) return <LoadingState />
+  if (error) return <ErrorState error={error} />
+  if (!roadTrip) return <NotFoundState />
 
   return (
-    <div>
+    <div className="animate-fadeIn">
       <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
 
-      {/* Hero section */}
       <RoadTripHero
         image={roadTrip.image}
         title={roadTrip.title}
@@ -190,34 +175,29 @@ export default function RoadTripPage() {
         tags={roadTrip.tags}
       />
 
-      <div className="container py-10">
+      <div className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Contenu principal */}
-          <div className="lg:col-span-2">
-            <div className="prose max-w-none">
-              <h2 className="text-xl font-bold text-gray-800">Description</h2>
-              <p className="text-lg text-gray-700 leading-relaxed">{roadTrip.description}</p>
+          <div className="lg:col-span-2 space-y-10">
+            <section className="prose max-w-none">
+              <h2 className="text-xl font-semibold text-foreground mb-2">Description</h2>
+              <p className="text-muted-foreground text-base leading-7">{roadTrip.description}</p>
+            </section>
 
-              {/* Points d'intérêt */}
-              {roadTrip.pointsOfInterest?.length > 0 && (
-                <PointsOfInterest points={roadTrip.pointsOfInterest} />
-              )}
+            {roadTrip.pointsOfInterest?.length > 0 && (
+              <PointsOfInterest points={roadTrip.pointsOfInterest} />
+            )}
 
-              {/* Itinéraire */}
-              {roadTrip.itinerary?.length > 0 && !roadTrip.isPremium && (
-                <RoadTripItinerary itinerary={roadTrip.itinerary} />
-              )}
+            {roadTrip.itinerary?.length > 0 && !roadTrip.isPremium && (
+              <RoadTripItinerary itinerary={roadTrip.itinerary} />
+            )}
 
-              {/* Itinéraire Premium */}
-              {roadTrip.isPremium && roadTrip.itinerary?.length > 0 && (
-                canAccessPremium 
-                  ? <PremiumItineraryUnlocked itinerary={roadTrip.itinerary} />
-                  : <PremiumItineraryLocked itinerary={roadTrip.itinerary} />
-              )}
-            </div>
+            {roadTrip.isPremium && roadTrip.itinerary?.length > 0 && (
+              canAccessPremium
+                ? <PremiumItineraryUnlocked itinerary={roadTrip.itinerary} />
+                : <PremiumItineraryLocked itinerary={roadTrip.itinerary} />
+            )}
           </div>
 
-          {/* Sidebar */}
           <RoadTripSidebar
             roadTrip={roadTrip}
             userRole={userRole}
@@ -232,4 +212,4 @@ export default function RoadTripPage() {
       </div>
     </div>
   )
-}
+} 

@@ -209,7 +209,7 @@ export const AdminService = {
       const token = AuthService.getAuthToken();
       if (!token) throw new Error("Vous devez être connecté pour créer un roadtrip");
 
-      const user = await AuthService.getUserData();
+      const user = await AuthService.getProfile();
       if (!user || user.role !== "admin") {
         throw new Error("Vous devez être administrateur pour créer un roadtrip");
       }
@@ -250,7 +250,7 @@ export const AdminService = {
       const token = AuthService.getAuthToken();
       if (!token) throw new Error("Vous devez être connecté pour créer un roadtrip");
 
-      const user = await AuthService.getUserData();
+      const user = await AuthService.getProfile();
       if (!user || user.role !== "admin") {
         throw new Error("Vous devez être administrateur pour créer un roadtrip");
       }
@@ -293,7 +293,7 @@ export const AdminService = {
       const token = AuthService.getAuthToken();
       if (!token) throw new Error("Vous devez être connecté pour créer un roadtrip");
 
-      const user = await AuthService.getUserData();
+      const user = await AuthService.getProfile();
       if (!user || user.role !== "admin") {
         throw new Error("Vous devez être administrateur pour créer un roadtrip");
       }
@@ -322,7 +322,7 @@ export const AdminService = {
   /**
    * Met à jour le statut d'un roadtrip (publié/non publié)
    */
-  async updateRoadtripStatus(roadtripId, isPublished) {
+  async updateRoadtripStatus(id, isPublished) {
     try {
       const token = AuthService.getAuthToken();
 
@@ -330,7 +330,7 @@ export const AdminService = {
         throw new Error("Non authentifié");
       }
 
-      const response = await fetch(`${API_GATEWAY_URL}/admin/roadtrips/${roadtripId}/status`, {
+      const response = await fetch(`${API_GATEWAY_URL}/roadtrips/status/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -338,6 +338,8 @@ export const AdminService = {
         },
         body: JSON.stringify({ isPublished })
       });
+      
+      console.log("CALL:", `${API_GATEWAY_URL}/roadtrips/status/${id}`, { isPublished });      
 
       if (!response.ok) {
         if (response.status === 401) {
