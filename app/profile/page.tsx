@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Loader2, User, Shield, Key, UserX } from "lucide-react"
+import { SubscriptionService } from "@/services/subscription-service"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -31,6 +32,8 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [subscription, setSubscription] = useState(null)
+  const [activeTab, setActiveTab] = useState("profile")
 
   // Formulaire de profil
   const [formData, setFormData] = useState({
@@ -51,22 +54,23 @@ export default function ProfilePage() {
   const [alertMessage, setAlertMessage] = useState("")
   const [alertType, setAlertType] = useState(null)
 
-  // Charge les données de l'utilisateur
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         setIsLoading(true)
-        const token = AuthService.getAuthToken()
 
+        const token = AuthService.getAuthToken()
         if (!token) {
           router.push('/auth')
           return
         }
 
         const userData = await AuthService.getProfile()
-        setUser(userData)
+        const currentSub = await SubscriptionService.getCurrentSubscription()
 
-        // Pré-remplit le formulaire avec les données de l'utilisateur
+        setUser(userData)
+        setSubscription(currentSub)
+
         setFormData({
           firstName: userData.firstName || "",
           lastName: userData.lastName || "",
@@ -74,18 +78,16 @@ export default function ProfilePage() {
           phoneNumber: userData.phoneNumber || ""
         })
 
-        setIsLoading(false)
       } catch (error) {
         console.error("Erreur lors du chargement du profil:", error)
         setAlertMessage("Impossible de charger votre profil. Veuillez vous reconnecter.")
         setAlertType("error")
-        setIsLoading(false)
-
-        // Redirige vers la page de connexion après un délai si erreur d'authentification
         setTimeout(() => {
           AuthService.logout()
           router.push('/auth')
         }, 2000)
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -192,6 +194,22 @@ export default function ProfilePage() {
     }
   }
 
+  const handleCancelSubscription = async () => {
+    try {
+      await SubscriptionService.cancelSubscription()
+      setAlertMessage("Votre abonnement a été annulé.")
+      setAlertType("success")
+      setUser({ ...user, role: "user" })
+  
+      // ⬇️ Revenir à l'onglet "profile"
+      setActiveTab("profile")
+    } catch (error) {
+      console.error("Erreur lors de l'annulation de l'abonnement:", error)
+      setAlertMessage("Une erreur est survenue lors de l'annulation.")
+      setAlertType("error")
+    }
+  }  
+
   // Affiche un écran de chargement
   if (isLoading) {
     return (
@@ -296,7 +314,7 @@ export default function ProfilePage() {
 
         {/* Sections principales */}
         <div>
-          <Tabs defaultValue="profile">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="profile" className="flex items-center">
                 <User className="mr-2 h-4 w-4" />
@@ -306,6 +324,12 @@ export default function ProfilePage() {
                 <TabsTrigger value="password" className="flex items-center">
                   <Key className="mr-2 h-4 w-4" />
                   Changer de mot de passe
+                </TabsTrigger>
+              )}
+              {user?.role === "premium" && (
+                <TabsTrigger value="subscription" className="flex items-center">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Mon abonnement
                 </TabsTrigger>
               )}
 
@@ -441,6 +465,29 @@ export default function ProfilePage() {
                 </Card>
               </TabsContent>
             )}
+            <TabsContent value="subscription">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Mon abonnement Premium</CardTitle>
+                  <CardDescription>
+                    Gérez votre abonnement, accédez aux options de mise à niveau ou annulez votre abonnement à tout moment.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p>Type de plan : <strong>Premium {user?.subscription?.plan || "mensuel"}</strong></p>
+                  <p>Status : <strong className="text-green-600">Actif</strong></p>
+                  {/* TODO: Ajoute infos dates si tu veux */}
+                </CardContent>
+                <CardFooter className="flex gap-4">
+                  <Button variant="secondary" onClick={() => router.push("/premium")}>
+                    Changer de plan
+                  </Button>
+                  <Button onClick={handleCancelSubscription}>
+                    Annuler mon abonnement
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
       </div>
