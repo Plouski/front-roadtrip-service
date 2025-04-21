@@ -238,6 +238,14 @@ export const AuthService = {
         return localStorage.getItem("auth_token");
     },
 
+    getUserId() {
+        return localStorage.getItem("userId");
+    },
+    
+    getUserRole() {
+        return localStorage.getItem("userRole");
+    },
+
     async isAdmin() {
         const user = await this.getProfile()
         return user?.role === 'admin'

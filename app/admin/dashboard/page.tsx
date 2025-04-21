@@ -202,28 +202,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Changement de statut d'un utilisateur (actif/inactif)
-  const toggleUserStatus = async (userId, isActive) => {
-    try {
-      setIsProcessingUser(true)
-      await AdminService.updateUserStatus(userId, !isActive)
-
-      // Mettre à jour localement sans refetch complet
-      setUsers(users.map(user =>
-        user.id === userId ? { ...user, isActive: !isActive } : user
-      ))
-
-      setAlertMessage(`Utilisateur ${!isActive ? 'activé' : 'désactivé'} avec succès`)
-      setAlertType("success")
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du statut de l'utilisateur:", error)
-      setAlertMessage("Impossible de mettre à jour le statut de l'utilisateur")
-      setAlertType("error")
-    } finally {
-      setIsProcessingUser(false)
-    }
-  }
-
   // Supprimer un utilisateur
   const deleteUser = async (userId) => {
     try {
@@ -242,28 +220,6 @@ export default function AdminDashboard() {
     } finally {
       setUserToDelete(null)
       setIsProcessingUser(false)
-    }
-  }
-
-  // Changer le statut d'un roadtrip (publié/brouillon)
-  const toggleRoadtripStatus = async (roadtripId, isPublished) => {
-    try {
-      setIsProcessingRoadtrip(true)
-      await AdminService.updateRoadtripStatus(roadtripId, !isPublished)
-
-      // Mettre à jour localement sans refetch complet
-      setRoadtrips(roadtrips.map(roadtrip =>
-        roadtrip.id === roadtripId ? { ...roadtrip, isPublished: !isPublished } : roadtrip
-      ))
-
-      setAlertMessage(`Roadtrip ${!isPublished ? 'publié' : 'dépublié'} avec succès`)
-      setAlertType("success")
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du statut du roadtrip:", error)
-      setAlertMessage("Impossible de mettre à jour le statut du roadtrip")
-      setAlertType("error")
-    } finally {
-      setIsProcessingRoadtrip(false)
     }
   }
 

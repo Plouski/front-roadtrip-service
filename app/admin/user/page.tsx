@@ -169,9 +169,19 @@ export default function UsersListPage() {
                       <TableCell>{user.firstName} {user.lastName}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === "admin" ? "default" : "outline"}>
-                          {user.role === "admin" ? "Admin" : "Utilisateur"}
-                        </Badge>
+                        {user.role === "admin" ? (
+                          <Badge variant="default">
+                            Admin
+                          </Badge>
+                        ) : user.role === "premium" ? (
+                          <Badge variant="success" className="bg-yellow-500 text-white">
+                            Premium
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            Utilisateur
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.isVerified ? "success" : "secondary"}>
