@@ -90,13 +90,14 @@ export const AuthService = {
     },
 
     /**
-     * Déconnexion de l'utilisateur
+     * Déconnexion de l'utilisateur avec nettoyage complet des données
      */
     async logout() {
         try {
             const token = this.getAuthToken();
 
             if (token) {
+                // Appel à l'API de déconnexion si un token est présent
                 await fetch(`${API_GATEWAY_URL}/auth/logout`, {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${token}` },
@@ -105,8 +106,12 @@ export const AuthService = {
         } catch (error) {
             console.error("Erreur pendant la déconnexion:", error);
         } finally {
+            // Supprimer TOUTES les données utilisateur du localStorage
             localStorage.removeItem("auth_token");
-            console.log("Token supprimé, déconnexion réussie");
+            localStorage.removeItem("userRole");
+            localStorage.removeItem("userId");
+
+            console.log("Données utilisateur supprimées, déconnexion réussie");
         }
     },
 
@@ -241,9 +246,83 @@ export const AuthService = {
     getUserId() {
         return localStorage.getItem("userId");
     },
-    
+
+    /**
+     * Récupère le rôle de l'utilisateur (synchrone)
+     * Utilise la valeur en cache dans localStorage
+     */
     getUserRole() {
-        return localStorage.getItem("userRole");
+        const role = localStorage.getItem("userRole");
+
+        if (role) {
+            const normalizedRole = role.toLowerCase();
+            if (normalizedRole === 'admin') return 'admin';
+            if (normalizedRole === 'premium') return 'premium';
+            return normalizedRole;
+        }
+
+        console.log('Aucun rôle trouvé dans localStorage');
+        return null;
+    },
+
+    /**
+     * Récupère le rôle de l'utilisateur de manière asynchrone
+     * Si le rôle n'est pas en cache, fait un appel API pour l'obtenir
+     */
+    async getUserRoleAsync() {
+        // 1. Essayer d'abord de récupérer le rôle du localStorage
+        const cachedRole = this.getUserRole();
+        if (cachedRole) return cachedRole;
+
+        // 2. Si pas de rôle en cache, mais token présent, essayer de récupérer depuis l'API
+        const token = this.getAuthToken();
+        if (!token) return null;
+
+        try {
+            const userData = await this.getProfile();
+
+            if (userData && userData.role) {
+                // Stocker le rôle dans localStorage pour les prochains accès
+                const role = userData.role.toLowerCase();
+                localStorage.setItem("userRole", role);
+                return role;
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération du rôle:', error);
+        }
+
+        return null;
+    },
+
+    /**
+     * Vérifie l'authentification et le rôle de l'utilisateur en une seule méthode
+     * @returns {Promise<{isAuthenticated: boolean, role: string|null}>}
+     */
+    async checkAuthenticationAndRole() {
+        try {
+            const isAuthenticated = await this.checkAuthentication();
+
+            if (!isAuthenticated) {
+                return { isAuthenticated: false, role: null };
+            }
+
+            // Utilisateur authentifié, récupérer son rôle (d'abord depuis le cache, puis depuis l'API si nécessaire)
+            const role = await this.getUserRoleAsync();
+
+            return {
+                isAuthenticated: true,
+                role: role,
+                // Fonction optionnelle pour utilisation ultérieure
+                setup: () => {
+                    if (typeof window !== "undefined" && role) {
+                        localStorage.setItem("userRole", role);
+                    }
+                }
+            };
+        } catch (error) {
+            console.error("Erreur lors de la vérification de l'authentification:", error);
+            return { isAuthenticated: false, role: null };
+        }
     },
 
     async isAdmin() {
