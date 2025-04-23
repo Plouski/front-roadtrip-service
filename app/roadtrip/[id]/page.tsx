@@ -160,7 +160,7 @@ export default function RoadTripPage() {
   if (!roadTrip) return <NotFoundState />
 
   return (
-    <div className="animate-fadeIn">
+    <div className="animate-fadeIn" id="roadtrip-pdf">
       <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
 
       <RoadTripHero

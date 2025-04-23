@@ -1,7 +1,9 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, DollarSign, Clock, Lock, Heart, Share2, FileText, AlertTriangle, Filter } from "lucide-react"
+import { Calendar, MapPin, DollarSign, Clock, Lock, Heart, Share2, FileText, AlertTriangle, Filter, Download } from "lucide-react"
 import Link from "next/link"
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 export const RoadTripHero = ({
     image,
@@ -287,7 +289,7 @@ export const RoadTripSidebar = ({
 
                     <Button
                         variant="outline"
-                        className="w-full font-medium flex items-center justify-center gap-2 rounded-full hover:bg-primary/5 transition-colors text-sm py-2 md:py-2.5"
+                        className="w-full rounded-full transition-colors text-sm py-1.5 md:py-2"
                         onClick={handleShare}
                     >
                         <Share2 className="h-4 w-4 md:h-5 md:w-5" />
@@ -297,12 +299,11 @@ export const RoadTripSidebar = ({
                     {/* Afficher les boutons d'export uniquement pour les utilisateurs premium ou admin ou si le roadtrip n'est pas premium */}
                     {(canAccessPremium || !roadTrip.isPremium) && (
                         <Button
-                            variant="outline"
-                            className="w-full font-medium flex items-center justify-center gap-2 rounded-full hover:bg-primary/5 transition-colors text-sm py-2 md:py-2.5"
-                            onClick={generatePdf}
+                            onClick={() => generateRoadtripPdf(roadTrip.title || "roadtrip")}
+                            className="w-full bg-stone-100 hover:bg-stone-200 text-stone-800 text-black font-medium flex items-center justify-center gap-2 rounded-full transition-colors text-sm shadow-sm hover:shadow py-2 md:py-2.5"
                         >
-                            <FileText className="h-4 w-4 md:h-5 md:w-5" />
-                            Exporter en PDF
+                            <Download className="h-4 w-4" />
+                            Télécharger PDF
                         </Button>
                     )}
 
@@ -312,12 +313,12 @@ export const RoadTripSidebar = ({
                             <h3 className="text-xs md:text-sm font-semibold text-gray-500 uppercase mb-2 md:mb-3">Administration</h3>
                             <div className="grid grid-cols-2 gap-2 md:gap-3">
                                 <Link href={`/admin/roadtrip/update/${roadTrip._id}`} className="col-span-1">
-                                    <Button variant="secondary" className="w-full rounded-full hover:bg-gray-100 transition-colors text-sm py-1.5 md:py-2">Modifier</Button>
+                                    <Button variant="outline" className="w-full rounded-full transition-colors text-sm py-1.5 md:py-2">Modifier</Button>
                                 </Link>
                                 <Button
-                                    variant="destructive"
+
                                     onClick={handleDelete}
-                                    className="w-full rounded-full transition-colors text-white bg-red-500/90 hover:bg-red-500 text-sm py-1.5 md:py-2"
+                                    className="w-full rounded-full transition-colors text-white bg-red-600 hover:bg-red-500 text-sm py-1.5 md:py-2"
                                 >
                                     Supprimer
                                 </Button>
@@ -379,3 +380,26 @@ export const NotFoundState = () => {
         </div>
     )
 }
+
+export const generateRoadtripPdf = async (fileName = "roadtrip") => {
+    const input = document.getElementById("roadtrip-pdf");
+    if (!input) return;
+
+    // Scroll to top to render everything if needed
+    window.scrollTo(0, 0);
+
+    const canvas = await html2canvas(input, {
+        scale: 2,
+        useCORS: true,
+        scrollY: -window.scrollY,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`${fileName}.pdf`);
+};

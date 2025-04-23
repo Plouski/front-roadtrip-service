@@ -22,6 +22,7 @@ export default function AuthPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("")
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const [alertType, setAlertType] = useState<"success" | "error" | null>(null)
+  const [activeTab, setActiveTab] = useState("login");
 
   // Vérifier si l'utilisateur est déjà connecté lors du chargement de la page
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function AuthPage() {
         router.push('/');
       }
     };
-    
+
     checkAuth();
   }, [router]);
 
@@ -44,7 +45,7 @@ export default function AuthPage() {
       await AuthService.login(email, password)
       setAlertMessage("Connexion réussie !")
       setAlertType("success")
-      
+
       // Redirection après un court délai pour que l'utilisateur voie le message de succès
       setTimeout(() => {
         router.push("/")
@@ -70,18 +71,23 @@ export default function AuthPage() {
     setIsLoading(true)
 
     try {
-      await AuthService.register(email, password, firstName, lastName)
-      setAlertMessage("Inscription réussie ! Veuillez vérifier votre e-mail.")
-      setAlertType("success")
-      
-      // Redirection vers la page de confirmation de compte après un court délai
+      await AuthService.register(email, password, firstName, lastName);
+      setAlertMessage("Inscription réussie ! Veuillez vérifier votre e-mail.");
+      setAlertType("success");
+
       setTimeout(() => {
-        router.push("/confirm-account")
+        setIsLoading(false);
+        setActiveTab("login"); // ← switch vers l'onglet "Connexion"
+        setFirstName("");
+        setLastName("");
+        setEmail("");
+        setPassword("");
+        setPasswordConfirm("");
       }, 1000);
     } catch (error) {
-      setAlertMessage(error.message || "Veuillez essayer avec un autre e-mail.")
-      setAlertType("error")
-      setIsLoading(false)
+      setAlertMessage(error.message || "Veuillez essayer avec un autre e-mail.");
+      setAlertType("error");
+      setIsLoading(false); // 👈 bien là aussi
     }
   }
 
@@ -92,7 +98,7 @@ export default function AuthPage() {
       setIsLoading(true);
       setAlertMessage(`Redirection vers ${provider}...`);
       setAlertType("success");
-      
+
       // Court délai pour afficher le message de chargement avant redirection
       setTimeout(() => {
         // Utilise la méthode socialLogin qui fait une redirection directe
@@ -109,7 +115,7 @@ export default function AuthPage() {
   return (
     <div className="container flex items-center justify-center min-h-[calc(100vh-4rem)] py-8">
       <div className="w-full max-w-md">
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="login">Connexion</TabsTrigger>
             <TabsTrigger value="register">Inscription</TabsTrigger>
@@ -139,7 +145,14 @@ export default function AuthPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="password">Mot de passe</Label>
-                      <a href="#" className="text-xs text-primary hover:underline">
+                      <a
+                        href="/forgot-password"
+                        className="text-xs text-primary hover:underline"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          router.push("/forgot-password");
+                        }}
+                      >
                         Mot de passe oublié ?
                       </a>
                     </div>
@@ -181,7 +194,7 @@ export default function AuthPage() {
                     <Button variant="outline" type="button" onClick={() => handleSocialLogin("google")}>
                       {/* Icône pour Google */}
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4"/>
+                        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4" />
                       </svg>
                       Google
                     </Button>
@@ -275,7 +288,7 @@ export default function AuthPage() {
                   <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
                     {isLoading ? "Création en cours..." : "Créer un compte"}
                   </Button>
-                  
+
                   {/* Ajout du composant AlertMessage dans le formulaire d'inscription */}
                   {alertMessage && <AlertMessage message={alertMessage} type={alertType!} />}
 
@@ -296,7 +309,7 @@ export default function AuthPage() {
                     <Button variant="outline" type="button" onClick={() => handleSocialLogin("google")}>
                       {/* Icône pour Google */}
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4"/>
+                        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4" />
                       </svg>
                       Google
                     </Button>
