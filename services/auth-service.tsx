@@ -110,6 +110,7 @@ export const AuthService = {
             localStorage.removeItem("auth_token");
             localStorage.removeItem("userRole");
             localStorage.removeItem("userId");
+            localStorage.removeItem("pushToken");
 
             console.log("Données utilisateur supprimées, déconnexion réussie");
         }
@@ -151,26 +152,26 @@ export const AuthService = {
      */
     async getProfile() {
         try {
-            const token = this.getAuthToken();
-            if (!token) throw new Error("Non authentifié");
+            if (typeof window === "undefined") return null;
 
-            const response = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
+            const token = localStorage.getItem("auth_token");
+            if (!token) return null;
+
+            const res = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
                 method: "GET",
-                headers: { "Authorization": `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` },
             });
 
-            if (!response.ok) {
-                if (response.status === 401) throw new Error("Session expirée, veuillez vous reconnecter");
-
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la récupération du profil");
+            if (!res.ok) {
+                localStorage.removeItem("auth_token");
+                return null;
             }
 
-            const data = await response.json();
+            const data = await res.json();
             return data.user;
-        } catch (error) {
-            console.error("Erreur lors de la récupération du profil:", error);
-            throw error;
+        } catch (e) {
+            console.warn("Erreur getProfile:", e.message);
+            return null;
         }
     },
 
@@ -346,19 +347,19 @@ export const AuthService = {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email }),
             });
-    
+
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || "Erreur lors de la demande de réinitialisation");
             }
-    
+
             return await response.json();
         } catch (error) {
             console.error("Erreur lors de la demande de réinitialisation:", error);
             throw error;
         }
     },
-    
+
     async initiatePasswordResetBySMS(phoneNumber) {
         try {
             const response = await fetch(`${API_GATEWAY_URL}/auth/initiate-password-reset-sms`, {
@@ -366,19 +367,19 @@ export const AuthService = {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ phoneNumber }),
             });
-    
+
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || "Erreur lors de la demande de réinitialisation par SMS");
             }
-    
+
             return await response.json();
         } catch (error) {
             console.error("Erreur lors de la demande de réinitialisation par SMS:", error);
             throw error;
         }
     },
-    
+
     async resetPassword(email, resetCode, newPassword) {
         try {
             const response = await fetch(`${API_GATEWAY_URL}/auth/reset-password`, {
@@ -386,12 +387,12 @@ export const AuthService = {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, resetCode, newPassword }),
             });
-    
+
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || "Erreur lors de la réinitialisation du mot de passe");
             }
-    
+
             return await response.json();
         } catch (error) {
             console.error("Erreur lors de la réinitialisation du mot de passe:", error);
