@@ -42,6 +42,8 @@ import {
 import RoadtripsListPage from "../roadtrip/page"
 import UsersListPage from "../user/page"
 import PushManager from "@/components/pushManager"
+import MetricsListPage from "../metric/page"
+import { MetricsService } from "@/services/metrics-service"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -192,7 +194,7 @@ export default function AdminDashboard() {
   const fetchMetrics = async () => {
     try {
       setIsLoading(true)
-      const data = await AdminService.getMetrics(metricsTimeframe)
+      const data = await MetricsService.getMetrics()
       setMetricsData(data)
     } catch (error) {
       console.error("Erreur lors de la récupération des métriques:", error)
@@ -415,131 +417,7 @@ export default function AdminDashboard() {
 
             {/* Onglet Métriques */}
             <TabsContent value="metrics" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Métriques et statistiques</CardTitle>
-                  <CardDescription>
-                    Analysez les tendances d'utilisation et les métriques de performance de la plateforme.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="font-medium">Période :</div>
-                    <div className="flex">
-                      <Button
-                        variant={metricsTimeframe === "week" ? "default" : "outline"}
-                        size="sm"
-                        className="rounded-r-none"
-                        onClick={() => setMetricsTimeframe("week")}
-                      >
-                        Semaine
-                      </Button>
-                      <Button
-                        variant={metricsTimeframe === "month" ? "default" : "outline"}
-                        size="sm"
-                        className="rounded-none border-l-0 border-r-0"
-                        onClick={() => setMetricsTimeframe("month")}
-                      >
-                        Mois
-                      </Button>
-                      <Button
-                        variant={metricsTimeframe === "year" ? "default" : "outline"}
-                        size="sm"
-                        className="rounded-l-none"
-                        onClick={() => setMetricsTimeframe("year")}
-                      >
-                        Année
-                      </Button>
-                    </div>
-                  </div>
-
-                  {isLoading ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                    </div>
-                  ) : (
-                    <div className="grid gap-6 md:grid-cols-2">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Croissance des utilisateurs</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-80">
-                          <div className="h-full w-full bg-muted/20 rounded-lg p-4 flex items-center justify-center">
-                            <div className="text-center text-muted-foreground">
-                              Graphique de croissance des utilisateurs
-                              <p className="text-xs mt-2">
-                                (Utilisez une librairie comme Recharts pour implémenter ce graphique)
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Création de roadtrips</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-80">
-                          <div className="h-full w-full bg-muted/20 rounded-lg p-4 flex items-center justify-center">
-                            <div className="text-center text-muted-foreground">
-                              Graphique de création de roadtrips
-                              <p className="text-xs mt-2">
-                                (Utilisez une librairie comme Recharts pour implémenter ce graphique)
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Taux d'engagement</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-80">
-                          <div className="h-full w-full bg-muted/20 rounded-lg p-4 flex items-center justify-center">
-                            <div className="text-center text-muted-foreground">
-                              Graphique de taux d'engagement
-                              <p className="text-xs mt-2">
-                                (Utilisez une librairie comme Recharts pour implémenter ce graphique)
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Statistiques clés</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <dl className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <dt className="text-sm font-medium text-muted-foreground">Nouveaux utilisateurs</dt>
-                              <dd className="text-sm font-semibold">+{metricsData.userGrowth[0]?.value || 0}</dd>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <dt className="text-sm font-medium text-muted-foreground">Roadtrips créés</dt>
-                              <dd className="text-sm font-semibold">+{metricsData.roadtripCreation[0]?.value || 0}</dd>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <dt className="text-sm font-medium text-muted-foreground">Taux de conversion</dt>
-                              <dd className="text-sm font-semibold">{metricsData.engagementRate[0]?.value || 0}%</dd>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <dt className="text-sm font-medium text-muted-foreground">Temps moyen sur le site</dt>
-                              <dd className="text-sm font-semibold">12m 30s</dd>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <dt className="text-sm font-medium text-muted-foreground">Taux de rebond</dt>
-                              <dd className="text-sm font-semibold">32%</dd>
-                            </div>
-                          </dl>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <MetricsListPage />
             </TabsContent>
           </Tabs>
         </div>
