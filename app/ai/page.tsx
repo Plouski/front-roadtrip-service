@@ -42,6 +42,8 @@ export default function AssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [includeWeather, setIncludeWeather] = useState(true);
+
 
   // Vérification d'authentification avec la méthode simplifiée
   useEffect(() => {
