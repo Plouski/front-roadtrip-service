@@ -50,6 +50,8 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [activeTab, setActiveTab] = useState("dashboard")
+  const [recentUsers, setRecentUsers] = useState([])
+  const [recentRoadtrips, setRecentRoadtrips] = useState([])
 
   // Statistiques globales
   const [stats, setStats] = useState({
@@ -105,7 +107,12 @@ export default function AdminDashboard() {
         setIsAdmin(true)
 
         // Charger les statistiques
-        fetchStats()
+        await fetchStats()
+        await fetchRecentUsers()
+        await fetchRecentRoadtrips()
+        await fetchRecentUsers()
+        await fetchRecentRoadtrips()
+
 
       } catch (error) {
         console.error("Erreur lors de la vérification des droits admin:", error)
@@ -157,6 +164,25 @@ export default function AdminDashboard() {
       setAlertType("error")
     }
   }
+
+  const fetchRecentUsers = async () => {
+    try {
+      const data = await AdminService.getRecentUsers()
+      setRecentUsers(data.users)
+    } catch (error) {
+      console.error("Erreur lors de la récupération des derniers utilisateurs:", error)
+    }
+  }
+
+  const fetchRecentRoadtrips = async () => {
+    try {
+      const data = await AdminService.getRecentRoadtrips()
+      setRecentRoadtrips(data.roadtrips)
+    } catch (error) {
+      console.error("Erreur lors de la récupération des derniers roadtrips:", error)
+    }
+  }
+
 
   // Récupérer la liste des utilisateurs
   const fetchUsers = async () => {
@@ -264,12 +290,6 @@ export default function AdminDashboard() {
       {user && <PushManager userId={user.id} />}
       <div className="container py-10">
         <div className="flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Administration</h1>
-            <Link href="/dashboard">
-              <Button variant="outline">Retour au Dashboard utilisateur</Button>
-            </Link>
-          </div>
 
           {alertMessage && (
             <AlertMessage message={alertMessage} type={alertType} />
@@ -347,8 +367,8 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {users.slice(0, 5).map(user => (
-                          <div key={user.id} className="flex items-center justify-between">
+                        {recentUsers.map(user => (
+                          <div key={user._id || user.id} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                                 {user.firstName?.charAt(0) || user.email.charAt(0)}
@@ -382,7 +402,7 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {roadtrips?.slice(0, 5).map(roadtrip => (
+                        {recentRoadtrips.map(roadtrip => (
                           <div key={roadtrip._id} className="flex items-center justify-between">
                             <div>
                               <div className="font-medium">{roadtrip.title}</div>

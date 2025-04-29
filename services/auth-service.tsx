@@ -2,6 +2,30 @@
 const API_GATEWAY_URL = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "https://api.example.com";
 
 export const AuthService = {
+
+    /**
+     * Inscription d'un nouvel utilisateur
+     */
+    async register(email, password, firstName, lastName) {
+        try {
+            const response = await fetch(`${API_GATEWAY_URL}/auth/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, firstName, lastName }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Échec d'inscription");
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error("Erreur d'inscription:", error);
+            throw error;
+        }
+    },
+    
     /**
      * Connexion de l'utilisateur
      */
@@ -27,29 +51,6 @@ export const AuthService = {
             return data;
         } catch (error) {
             console.error("Erreur pendant la connexion:", error);
-            throw error;
-        }
-    },
-
-    /**
-     * Inscription d'un nouvel utilisateur
-     */
-    async register(email, password, firstName, lastName) {
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/register`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, firstName, lastName }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Échec d'inscription");
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error("Erreur d'inscription:", error);
             throw error;
         }
     },
