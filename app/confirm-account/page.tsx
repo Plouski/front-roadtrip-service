@@ -5,18 +5,18 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { AlertMessage } from "@/components/ui/alert-message";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { AuthService } from "@/services/auth-service";
 
 export default function ConfirmAccountPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
-
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<"success" | "error" | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const verifyToken = async () => {
+    const verify = async () => {
       if (!token) {
         setMessage("Lien invalide ou expiré.");
         setStatus("error");
@@ -24,27 +24,13 @@ export default function ConfirmAccountPage() {
         return;
       }
 
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_AUTH_SERVICE_URL}/auth/verify-account`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message);
-
-        setMessage("Votre compte a bien été vérifié. Vous pouvez maintenant vous connecter !");
-        setStatus("success");
-      } catch (err: any) {
-        setMessage(err.message || "Une erreur est survenue.");
-        setStatus("error");
-      } finally {
-        setLoading(false);
-      }
+      const { success, message } = await AuthService.verifyAccountToken(token);
+      setMessage(message);
+      setStatus(success ? "success" : "error");
+      setLoading(false);
     };
 
-    verifyToken();
+    verify();
   }, [token]);
 
   return (

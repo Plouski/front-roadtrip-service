@@ -1,404 +1,407 @@
-// Point d'entrée pour l'URL du service d'authentification
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "https://api.example.com";
+const API_GATEWAY_URL =
+  process.env.NEXT_PUBLIC_DB_SERVICE_URL || "https://api.example.com";
+const OAUTH_URL =
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "https://api.example.com";
 
 export const AuthService = {
+  // ======================
+  // 🔐 Authentification de base
+  // ======================
 
-    /**
-     * Inscription d'un nouvel utilisateur
-     */
-    async register(email, password, firstName, lastName) {
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/register`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, firstName, lastName }),
-            });
+  async register(email, password, firstName, lastName) {
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, firstName, lastName }),
+      });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Échec d'inscription");
-            }
+      if (!res.ok)
+        throw new Error((await res.json()).message || "Échec d'inscription");
 
-            return await response.json();
-        } catch (error) {
-            console.error("Erreur d'inscription:", error);
-            throw error;
-        }
-    },
-    
-    /**
-     * Connexion de l'utilisateur
-     */
-    async login(email, password) {
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
+      return await res.json();
+    } catch (error) {
+      console.error("Erreur d'inscription:", error);
+      throw error;
+    }
+  },
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Échec de connexion");
-            }
+  async login(email, password) {
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-            const data = await response.json();
+      if (!res.ok)
+        throw new Error((await res.json()).message || "Échec de connexion");
 
-            // Stockage du token
-            const token = data.tokens?.accessToken || data.token;
-            if (token) localStorage.setItem("auth_token", token);
+      const data = await res.json();
 
-            return data;
-        } catch (error) {
-            console.error("Erreur pendant la connexion:", error);
-            throw error;
-        }
-    },
+      localStorage.setItem("auth_token", data.tokens?.accessToken || "");
+      localStorage.setItem("refresh_token", data.tokens?.refreshToken || "");
 
-    /**
-     * Vérifie la validité du token JWT
-     */
-    async checkAuthentication() {
-        const token = localStorage.getItem("auth_token");
-        if (!token) return false;
+      return data;
+    } catch (error) {
+      console.error("Erreur pendant la connexion:", error);
+      throw error;
+    }
+  },
 
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/verify-token`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token }),
-            });
+  async logout() {
+    try {
+      const token = this.getAuthToken();
 
-            if (!response.ok) {
-                console.warn("Token invalide ou expiré, suppression...");
-                localStorage.removeItem("auth_token");
-                return false;
-            }
+      if (token) {
+        await fetch(`${API_GATEWAY_URL}/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch((err) => console.warn("Erreur lors de la déconnexion:", err));
+      }
+    } finally {
+      this.clearAuthStorage();
+      console.log("Déconnexion réussie, données nettoyées.");
+    }
+  },
 
-            const data = await response.json();
-            if (!data?.valid || !data?.user) {
-                console.warn("Données utilisateur invalides, suppression du token...");
-                localStorage.removeItem("auth_token");
-                return false;
-            }
+  // ======================
+  // 🎫 Gestion des tokens
+  // ======================
 
-            return true;
-        } catch (error) {
-            console.warn("Échec de vérification du token:", error);
-            localStorage.removeItem("auth_token");
-            return false;
-        }
-    },
+  async verifyToken(token) {
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/verify-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
 
-    /**
-     * Déconnexion de l'utilisateur avec nettoyage complet des données
-     */
-    async logout() {
-        try {
-            const token = this.getAuthToken();
+      if (!res.ok) return false;
 
-            if (token) {
-                // Appel à l'API de déconnexion si un token est présent
-                await fetch(`${API_GATEWAY_URL}/auth/logout`, {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${token}` },
-                }).catch(err => console.warn("Erreur lors de la déconnexion du serveur:", err));
-            }
-        } catch (error) {
-            console.error("Erreur pendant la déconnexion:", error);
-        } finally {
-            // Supprimer TOUTES les données utilisateur du localStorage
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("userRole");
-            localStorage.removeItem("userId");
-            localStorage.removeItem("pushToken");
+      const data = await res.json();
+      return data?.valid && data?.user;
+    } catch {
+      return false;
+    }
+  },
 
-            console.log("Données utilisateur supprimées, déconnexion réussie");
-        }
-    },
+  async refreshToken() {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) return null;
 
-    /**
-     * Authentification via un fournisseur OAuth
-     */
-    socialLogin(provider) {
-        try {
-            let url;
-            switch (provider.toLowerCase()) {
-                case 'google':
-                    url = `${API_GATEWAY_URL}/auth/oauth/google`;
-                    break;
-                case 'facebook':
-                    url = `${API_GATEWAY_URL}/auth/oauth/facebook/callback`;
-                    break;
-                case 'github':
-                    url = `${API_GATEWAY_URL}/auth/oauth/github`;
-                    break;
-                default:
-                    throw new Error(`Fournisseur d'authentification non supporté: ${provider}`);
-            }
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/refresh-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
 
-            // Redirection vers le fournisseur OAuth
-            window.location.href = url;
+      if (!res.ok) return null;
 
-            // La promesse ne se résout jamais à cause de la redirection
-            return new Promise(() => { });
-        } catch (error) {
-            console.error(`Erreur lors de l'authentification ${provider}:`, error);
-            return Promise.reject(error);
-        }
-    },
+      const data = await res.json();
+      localStorage.setItem("auth_token", data.accessToken);
+      return data.accessToken;
+    } catch (error) {
+      console.warn("Erreur lors du refresh token:", error);
+      return null;
+    }
+  },
 
-    /**
-     * Récupération du profil utilisateur
-     */
-    async getProfile() {
-        try {
-            if (typeof window === "undefined") return null;
+  // ======================
+  // ✅ Vérification de compte
+  // ======================
 
-            const token = localStorage.getItem("auth_token");
-            if (!token) return null;
-
-            const res = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
-                method: "GET",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (!res.ok) {
-                localStorage.removeItem("auth_token");
-                return null;
-            }
-
-            const data = await res.json();
-            return data.user;
-        } catch (e) {
-            console.warn("Erreur getProfile:", e.message);
-            return null;
-        }
-    },
-
-    /**
-     * Mise à jour du profil utilisateur
-     */
-    async updateProfile(profileData) {
-        try {
-            const token = this.getAuthToken();
-            if (!token) throw new Error("Non authentifié");
-
-            const response = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                },
-                body: JSON.stringify(profileData),
-            });
-
-            if (!response.ok) {
-                if (response.status === 401) throw new Error("Session expirée, veuillez vous reconnecter");
-
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la mise à jour du profil");
-            }
-
-            const data = await response.json();
-            return data.user;
-        } catch (error) {
-            console.error("Erreur lors de la mise à jour du profil:", error);
-            throw error;
-        }
-    },
-
-    /**
-     * Changement de mot de passe
-     */
-    async changePassword(currentPassword, newPassword) {
-        try {
-            const token = this.getAuthToken();
-            if (!token) throw new Error("Non authentifié");
-
-            const response = await fetch(`${API_GATEWAY_URL}/auth/change-password`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                },
-                body: JSON.stringify({ currentPassword, newPassword }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors du changement de mot de passe");
-            }
-
-            const data = await response.json();
-            return data.message;
-        } catch (error) {
-            console.error("Erreur lors du changement de mot de passe:", error);
-            throw error;
-        }
-    },
-
-    /**
-     * Récupère le token stocké en local
-     */
-    getAuthToken() {
-        return localStorage.getItem("auth_token");
-    },
-
-    getUserId() {
-        return localStorage.getItem("userId");
-    },
-
-    /**
-     * Récupère le rôle de l'utilisateur (synchrone)
-     * Utilise la valeur en cache dans localStorage
-     */
-    getUserRole() {
-        const role = localStorage.getItem("userRole");
-
-        if (role) {
-            const normalizedRole = role.toLowerCase();
-            if (normalizedRole === 'admin') return 'admin';
-            if (normalizedRole === 'premium') return 'premium';
-            return normalizedRole;
-        }
-
-        console.log('Aucun rôle trouvé dans localStorage');
-        return null;
-    },
-
-    /**
-     * Récupère le rôle de l'utilisateur de manière asynchrone
-     * Si le rôle n'est pas en cache, fait un appel API pour l'obtenir
-     */
-    async getUserRoleAsync() {
-        // 1. Essayer d'abord de récupérer le rôle du localStorage
-        const cachedRole = this.getUserRole();
-        if (cachedRole) return cachedRole;
-
-        // 2. Si pas de rôle en cache, mais token présent, essayer de récupérer depuis l'API
-        const token = this.getAuthToken();
-        if (!token) return null;
-
-        try {
-            const userData = await this.getProfile();
-
-            if (userData && userData.role) {
-                // Stocker le rôle dans localStorage pour les prochains accès
-                const role = userData.role.toLowerCase();
-                localStorage.setItem("userRole", role);
-                return role;
-            }
-        } catch (error) {
-            console.error('Erreur lors de la récupération du rôle:', error);
-        }
-
-        return null;
-    },
-
-    /**
-     * Vérifie l'authentification et le rôle de l'utilisateur en une seule méthode
-     * @returns {Promise<{isAuthenticated: boolean, role: string|null}>}
-     */
-    async checkAuthenticationAndRole() {
-        try {
-            const isAuthenticated = await this.checkAuthentication();
-
-            if (!isAuthenticated) {
-                return { isAuthenticated: false, role: null };
-            }
-
-            // Utilisateur authentifié, récupérer son rôle (d'abord depuis le cache, puis depuis l'API si nécessaire)
-            const role = await this.getUserRoleAsync();
-
-            return {
-                isAuthenticated: true,
-                role: role,
-                // Fonction optionnelle pour utilisation ultérieure
-                setup: () => {
-                    if (typeof window !== "undefined" && role) {
-                        localStorage.setItem("userRole", role);
-                    }
-                }
-            };
-        } catch (error) {
-            console.error("Erreur lors de la vérification de l'authentification:", error);
-            return { isAuthenticated: false, role: null };
-        }
-    },
-
-    async isAdmin() {
-        const user = await this.getProfile()
-        return user?.role === 'admin'
-    },
-
-    async getAuthHeaders() {
-        const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-
+  async verifyAccountToken(token) {
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/verify-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+  
+      const data = await res.json();
+      if (!res.ok)
         return {
-            "Content-Type": "application/json",
-            ...(token && { Authorization: `Bearer ${token}` }),
+          success: false,
+          message: data.message || "Erreur de vérification.",
         };
-    },
+  
+      return {
+        success: true,
+        message: data.message || "Votre compte a bien été vérifié.",
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err.message || "Une erreur est survenue.",
+      };
+    }
+  },  
 
-    async initiatePasswordReset(email) {
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/initiate-password-reset`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
+  // ======================
+  // 🔑 Mot de passe
+  // ======================
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la demande de réinitialisation");
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error("Erreur lors de la demande de réinitialisation:", error);
-            throw error;
+  async initiatePasswordReset(email) {
+    try {
+      const res = await fetch(
+        `${API_GATEWAY_URL}/auth/initiate-password-reset`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
         }
-    },
+      );
 
-    async initiatePasswordResetBySMS(phoneNumber) {
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/initiate-password-reset-sms`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phoneNumber }),
-            });
+      if (!res.ok)
+        throw new Error(
+          (await res.json()).message ||
+            "Erreur lors de la demande de réinitialisation"
+        );
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la demande de réinitialisation par SMS");
-            }
+      return await res.json();
+    } catch (error) {
+      console.error("Erreur réinitialisation par email:", error);
+      throw error;
+    }
+  },
 
-            return await response.json();
-        } catch (error) {
-            console.error("Erreur lors de la demande de réinitialisation par SMS:", error);
-            throw error;
+  async initiatePasswordResetBySMS(phoneNumber) {
+    try {
+      const res = await fetch(
+        `${API_GATEWAY_URL}/auth/initiate-password-reset-sms`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phoneNumber }),
         }
-    },
+      );
 
-    async resetPassword(email, resetCode, newPassword) {
-        try {
-            const response = await fetch(`${API_GATEWAY_URL}/auth/reset-password`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, resetCode, newPassword }),
-            });
+      if (!res.ok)
+        throw new Error(
+          (await res.json()).message || "Erreur de réinitialisation par SMS"
+        );
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Erreur lors de la réinitialisation du mot de passe");
-            }
+      return await res.json();
+    } catch (error) {
+      console.error("Erreur SMS reset:", error);
+      throw error;
+    }
+  },
 
-            return await response.json();
-        } catch (error) {
-            console.error("Erreur lors de la réinitialisation du mot de passe:", error);
-            throw error;
-        }
+  async resetPassword(email, resetCode, newPassword) {
+    console.log("📦 Payload resetPassword:", { email, resetCode, newPassword });
+  
+    if (!email || !resetCode || !newPassword) {
+      throw new Error("Email, code de réinitialisation et nouveau mot de passe requis");
+    }
+  
+    const res = await fetch(`${API_GATEWAY_URL}/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, resetCode, newPassword }),
+    });
+  
+    if (!res.ok)
+      throw new Error((await res.json()).message || "Erreur reset password");
+  
+    return await res.json();
+  },  
+
+  async changePassword(currentPassword, newPassword) {
+    const token = this.getAuthToken();
+    if (!token) throw new Error("Non authentifié");
+
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/change-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      if (!res.ok)
+        throw new Error(
+          (await res.json()).message || "Erreur changement mot de passe"
+        );
+
+      return (await res.json()).message;
+    } catch (error) {
+      console.error("Erreur changement mot de passe:", error);
+      throw error;
+    }
+  },
+
+  // ======================
+  // 👤 Profil utilisateur
+  // ======================
+
+  async getProfile() {
+    const token = this.getAuthToken();
+    if (!token) return null;
+
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        this.clearAuthStorage();
+        return null;
+      }
+
+      return (await res.json()).user;
+    } catch (error) {
+      console.warn("Erreur getProfile:", error);
+      return null;
+    }
+  },
+
+  async updateProfile(profileData) {
+    const token = this.getAuthToken();
+    if (!token) throw new Error("Non authentifié");
+
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      if (!res.ok)
+        throw new Error(
+          (await res.json()).message || "Erreur mise à jour du profil"
+        );
+
+      return (await res.json()).user;
+    } catch (error) {
+      console.error("Erreur updateProfile:", error);
+      throw error;
+    }
+  },
+
+  // ======================
+  // 🌐 Connexion sociale
+  // ======================
+
+  async socialLogin(provider) {
+    try {
+      const urlMap = {
+        google: `${OAUTH_URL}/auth/oauth/google`,
+        facebook: `${OAUTH_URL}/auth/oauth/facebook/callback`,
+        github: `${OAUTH_URL}/auth/oauth/github`,
+      };
+
+      const url = urlMap[provider.toLowerCase()];
+      if (!url) throw new Error(`Fournisseur non supporté : ${provider}`);
+
+      window.location.href = url;
+      return new Promise(() => {});
+    } catch (error) {
+      console.error(`Erreur OAuth (${provider}):`, error);
+      throw error;
+    }
+  },
+
+  // ======================
+  // ❌ Suppression de compte
+  // ======================
+
+  async deleteAccount() {
+    const token = this.getAuthToken();
+    if (!token) throw new Error("Non authentifié");
+
+    try {
+      const res = await fetch(`${API_GATEWAY_URL}/auth/account`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error((await res.json()).message || "Erreur suppression du compte");
+      }
+
+      // Nettoyage local après suppression
+      this.clearAuthStorage();
+
+      return await res.json();
+    } catch (error) {
+      console.error("Erreur suppression du compte:", error);
+      throw error;
+    }
+  },
+
+  // ======================
+  // 🧠 Vérification session + rôle
+  // ======================
+
+  async checkAuthentication() {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return false;
+
+    if (await this.verifyToken(token)) return true;
+
+    const newToken = await this.refreshToken();
+    if (!newToken || !(await this.verifyToken(newToken))) {
+      this.clearAuthStorage();
+      return false;
     }
 
+    return true;
+  },
+
+  async checkAuthenticationAndRole(expectedRoles: string | string[]) {
+    const isAuthenticated = await this.checkAuthentication();
+    if (!isAuthenticated) return false;
+
+    const role = await this.getUserRoleAsync();
+    if (!role) return false;
+
+    if (Array.isArray(expectedRoles)) {
+      return expectedRoles.includes(role);
+    }
+
+    return role === expectedRoles;
+  },
+
+  getAuthToken() {
+    return localStorage.getItem("auth_token");
+  },
+
+  getUserRole() {
+    const role = localStorage.getItem("userRole");
+    if (role) return role.toLowerCase();
+    return null;
+  },
+
+  async getUserRoleAsync() {
+    const cached = this.getUserRole();
+    if (cached) return cached;
+
+    const token = this.getAuthToken();
+    if (!token) return null;
+
+    const profile = await this.getProfile();
+    if (profile?.role) {
+      localStorage.setItem("userRole", profile.role.toLowerCase());
+      return profile.role.toLowerCase();
+    }
+
+    return null;
+  },
+
+  clearAuthStorage() {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("userRole");
+  },
 };
