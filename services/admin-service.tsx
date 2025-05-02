@@ -3,6 +3,23 @@ import { AuthService } from "./auth-service";
 const API_GATEWAY_URL = process.env.NEXT_PUBLIC_DB_SERVICE_URL || "https://api.example.com";
 
 export const AdminService = {
+
+  /**
+   * Vérifie si l'utilisateur actuel est administrateur
+   */
+  async isAdmin() {
+    try {
+      const user = await AuthService.getProfile();
+      if (user && user.role && user.role.toLowerCase() === "admin") {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Erreur dans isAdmin:", error);
+      return false;
+    }
+  },
+  
   /**
    * Récupère les statistiques générales du système
    */
