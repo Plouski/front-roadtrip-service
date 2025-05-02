@@ -96,7 +96,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const checkAdminAccess = async () => {
       try {
-        const isAdminUser = await AuthService.isAdmin()
+        const isAdminUser = await AdminService.isAdmin()
 
         if (!isAdminUser) {
           // Rediriger si l'utilisateur n'est pas admin

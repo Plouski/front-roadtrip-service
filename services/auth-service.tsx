@@ -119,14 +119,14 @@ export const AuthService = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
-  
+
       const data = await res.json();
       if (!res.ok)
         return {
           success: false,
           message: data.message || "Erreur de vérification.",
         };
-  
+
       return {
         success: true,
         message: data.message || "Votre compte a bien été vérifié.",
@@ -137,7 +137,7 @@ export const AuthService = {
         message: err.message || "Une erreur est survenue.",
       };
     }
-  },  
+  },
 
   // ======================
   // 🔑 Mot de passe
@@ -192,22 +192,24 @@ export const AuthService = {
 
   async resetPassword(email, resetCode, newPassword) {
     console.log("📦 Payload resetPassword:", { email, resetCode, newPassword });
-  
+
     if (!email || !resetCode || !newPassword) {
-      throw new Error("Email, code de réinitialisation et nouveau mot de passe requis");
+      throw new Error(
+        "Email, code de réinitialisation et nouveau mot de passe requis"
+      );
     }
-  
+
     const res = await fetch(`${API_GATEWAY_URL}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, resetCode, newPassword }),
     });
-  
+
     if (!res.ok)
       throw new Error((await res.json()).message || "Erreur reset password");
-  
+
     return await res.json();
-  },  
+  },
 
   async changePassword(currentPassword, newPassword) {
     const token = this.getAuthToken();
@@ -327,7 +329,9 @@ export const AuthService = {
       });
 
       if (!res.ok) {
-        throw new Error((await res.json()).message || "Erreur suppression du compte");
+        throw new Error(
+          (await res.json()).message || "Erreur suppression du compte"
+        );
       }
 
       // Nettoyage local après suppression
@@ -343,6 +347,16 @@ export const AuthService = {
   // ======================
   // 🧠 Vérification session + rôle
   // ======================
+
+  async getAuthHeaders() {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  },
 
   async checkAuthentication() {
     const token = localStorage.getItem("auth_token");
