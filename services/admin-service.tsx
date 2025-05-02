@@ -7,43 +7,43 @@ export const AdminService = {
    * Récupère les statistiques générales du système
    */
   async getStats() {
-    try {
-      const token = AuthService.getAuthToken();
-
-      if (!token) {
-        throw new Error("Non authentifié");
-      }
-
-      const response = await fetch(`${API_GATEWAY_URL}/admin/stats`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expirée, veuillez vous reconnecter");
-        } else if (response.status === 403) {
-          throw new Error("Vous n'avez pas les autorisations nécessaires");
-        }
-
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur lors de la récupération des statistiques");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur lors de la récupération des statistiques:", error);
-      // Pour faciliter le développement, retournons des données fictives
-      return {
-        totalUsers: 248,
-        activeUsers: 187,
-        totalRoadtrips: 126,
-        publishedRoadtrips: 93,
-        totalLikes: 542,
-        totalComments: 328
-      };
+    const headers = await AuthService.getAuthHeaders()
+  
+    const res = await fetch(`${API_GATEWAY_URL}/admin/stats`, {
+      method: "GET",
+      headers,
+    })
+  
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || "Impossible de récupérer les statistiques")
     }
+  
+    return res.json()
+  },
+  
+  async getRecentUsers() {
+    const headers = await AuthService.getAuthHeaders()
+
+    const res = await fetch(`${API_GATEWAY_URL}/admin/users/recent`, {
+      method: "GET",
+      headers,
+    })
+
+    if (!res.ok) throw new Error("Impossible de récupérer les derniers utilisateurs")
+    return res.json()
+  },
+
+  async getRecentRoadtrips() {
+    const headers = await AuthService.getAuthHeaders()
+
+    const res = await fetch(`${API_GATEWAY_URL}/admin/roadtrips/recent`, {
+      method: "GET",
+      headers,
+    })
+
+    if (!res.ok) throw new Error("Impossible de récupérer les derniers roadtrips")
+    return res.json()
   },
 
   /**

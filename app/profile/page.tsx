@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AlertMessage } from "@/components/ui/alert-message"
 import { AuthService } from "@/services/auth-service"
-// import { UserService } from "@/services/user-service"
 
 import {
   AlertDialog,
@@ -176,7 +175,7 @@ export default function ProfilePage() {
     setIsDeleting(true)
 
     try {
-      await UserService.deleteAccount()
+      await AuthService.deleteAccount()
 
       // Message de confirmation et déconnexion
       setAlertMessage("Votre compte a été supprimé")
