@@ -18,8 +18,10 @@ export default function PremiumSuccessPage() {
     const fetchData = async () => {
       try {
         const userData = await AuthService.getProfile()
+        
+        // ❌ Ne pas forcer une update ici — Stripe l'a déjà fait via le webhook
         const sub = await SubscriptionService.getCurrentSubscription()
-
+  
         setUser(userData)
         setSubscription(sub)
       } catch (error) {
@@ -28,9 +30,9 @@ export default function PremiumSuccessPage() {
         setLoading(false)
       }
     }
-
+  
     fetchData()
-  }, [])
+  }, [])    
 
   if (loading) {
     return (
@@ -47,15 +49,12 @@ export default function PremiumSuccessPage() {
         <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
         <h1 className="text-2xl font-bold">Bienvenue dans Premium 🚀</h1>
         <p className="text-muted-foreground">
-          Merci {user?.firstName} pour votre abonnement <strong>{user?.subscription?.plan === 'annual' ? 'annuel' : 'mensuel'}</strong> !
+          Merci {user?.firstName} pour votre abonnement <strong>{subscription?.plan === 'annual' ? 'annuel' : 'mensuel'}</strong> !
         </p>
 
         <div className="rounded-lg bg-gray-50 p-4 text-left text-sm">
-          <p><span className="font-medium">Statut :</span> {user?.subscription?.status}</p>
-          <p><span className="font-medium">Début :</span> {new Date(user?.subscription?.startDate).toLocaleDateString()}</p>
-          {subscription?.endDate && (
-            <p><span className="font-medium">Fin :</span> {new Date(user?.subscription?.endDate).toLocaleDateString()}</p>
-          )}
+          <p><span className="font-medium">Statut :</span> {subscription?.status}</p>
+          <p><span className="font-medium">Début :</span> {new Date(subscription?.startDate).toLocaleDateString()}</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">

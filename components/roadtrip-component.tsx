@@ -32,7 +32,7 @@ export const RoadTripHero = ({
                         </Badge>
                     ))}
                 </div>
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 tracking-tight">{title}</h1>
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">{title}</h1>
                 <div className="flex items-center text-base md:text-lg font-medium">
                     <MapPin className="mr-2 h-4 w-4 md:h-5 md:w-5 text-white/90" />
                     <span className="text-white/90">{country}

@@ -22,29 +22,35 @@ export default function Home() {
   const fetchRoadtrips = async () => {
     setLoading(true)
     try {
+
       const allTrips = await RoadtripService.getAllPublicRoadtrips()
+
       let filtered = allTrips
 
+      {/* Destination */}
       if (searchQuery.trim()) {
-        filtered = filtered.filter(trip =>
+        filtered = filtered.filter((trip: { title: string }) =>
           trip.title.toLowerCase().includes(searchQuery.toLowerCase())
         )
       }
 
+      {/* Pays */}
       if (selectedCountry !== "all") {
-        filtered = filtered.filter(trip => trip.country === selectedCountry)
+        filtered = filtered.filter((trip: { country: string }) => trip.country === selectedCountry)
       }
 
+      {/* Durée */}
       if (durationRange !== "all") {
-        filtered = filtered.filter(trip => {
+        filtered = filtered.filter((trip: { duration: number }) => {
           if (durationRange === "short") return trip.duration <= 3
           if (durationRange === "medium") return trip.duration > 3 && trip.duration <= 7
           if (durationRange === "long") return trip.duration > 7
         })
       }
 
+      {/* Budget */}
       if (budgetRange !== "all") {
-        filtered = filtered.filter(trip => {
+        filtered = filtered.filter((trip: { budget: { amount: number } }) => {
           const amount = trip.budget?.amount || 0
           if (budgetRange === "low") return amount <= 500
           if (budgetRange === "medium") return amount > 500 && amount <= 1000
@@ -52,16 +58,19 @@ export default function Home() {
         })
       }
 
+      {/* Saison */}
       if (season !== "all") {
-        filtered = filtered.filter(trip => trip.bestSeason?.toLowerCase() === season)
+        filtered = filtered.filter((trip: { bestSeason: string }) => trip.bestSeason?.toLowerCase() === season)
       }
 
+      {/* Tag */}
       if (selectedTag !== "all") {
-        filtered = filtered.filter(trip => trip.tags?.includes(selectedTag))
+        filtered = filtered.filter((trip: { tags: string | string[] }) => trip.tags?.includes(selectedTag))
       }
 
+      {/* Type de roadtrip */}
       if (isPremium !== "all") {
-        filtered = filtered.filter(trip => trip.isPremium === (isPremium === "true"))
+        filtered = filtered.filter((trip: { isPremium: boolean }) => trip.isPremium === (isPremium === "true"))
       }
 
       setRoadtrips(filtered)
@@ -74,7 +83,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchRoadtrips()
-  }, [searchQuery, selectedCountry, durationRange, budgetRange, season, selectedTag, isPremium])
+  }, [])
 
   const allCountries = Array.from(new Set(roadtrips.map(trip => trip.country)))
   const allTags = Array.from(new Set(roadtrips.flatMap(trip => trip.tags || [])))
@@ -82,7 +91,7 @@ export default function Home() {
   return (
     <div className="overflow-hidden">
       <Hero />
-      <div className="container py-12 px-4 sm:px-6 lg:px-8">
+      <div className="py-10 px-5">
         <SearchFilters
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -100,6 +109,7 @@ export default function Home() {
           setIsPremium={setIsPremium}
           allCountries={allCountries}
           allTags={allTags}
+          onSearch={fetchRoadtrips}
         />
         <PopularRoadtrips
           roadtrips={roadtrips}
@@ -112,11 +122,14 @@ export default function Home() {
             setSeason("all")
             setSelectedTag("all")
             setIsPremium("all")
-          }}
+            setTimeout(() => {
+              fetchRoadtrips()
+            }, 0)
+          }}          
         />
-      </div>
       <PremiumFeatures />
       <HowItWorks />
+      </div>
     </div>
   )
 }

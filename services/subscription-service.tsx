@@ -49,61 +49,6 @@ export const SubscriptionService = {
     }
   },  
 
-  async isPremiumUser() {
-    try {
-      const token = AuthService.getAuthToken();
-      const userId = AuthService.getUserId();
-      if (!token || !userId) return false;
-
-      const response = await fetch(`${SUBSCRIPTION_API_URL}/status/${userId}`, {
-        method: "GET",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-
-      const data = await response.json();
-      return data.isPremium === true;
-    } catch (error) {
-      console.error("Erreur isPremiumUser:", error);
-      return false;
-    }
-  },
-
-  async canAccessPremiumContent() {
-    try {
-      const userRole = AuthService.getUserRole();
-      if (userRole === 'admin' || userRole === 'premium') return true;
-      return await this.isPremiumUser();
-    } catch (error) {
-      console.error("Erreur canAccessPremiumContent:", error);
-      return false;
-    }
-  },
-
-  async updateSubscription(subscriptionData) {
-    try {
-      const token = AuthService.getAuthToken();
-      if (!token) throw new Error("Non authentifié");
-
-      const response = await fetch(`${SUBSCRIPTION_API_URL}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(subscriptionData)
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur updateSubscription:", error);
-      throw error;
-    }
-  },
-
   async cancelSubscription() {
     try {
       const token = AuthService.getAuthToken();
@@ -122,49 +67,7 @@ export const SubscriptionService = {
       throw error;
     }
   },
-
-  async getSubscriptionHistory(options = {}) {
-    try {
-      const token = AuthService.getAuthToken();
-      if (!token) throw new Error("Non authentifié");
-
-      const queryParams = new URLSearchParams({
-        limit: options.limit || 10,
-        page: options.page || 1,
-        ...(options.status ? { status: options.status } : {})
-      }).toString();
-
-      const response = await fetch(`${SUBSCRIPTION_API_URL}/history?${queryParams}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur getSubscriptionHistory:", error);
-      throw error;
-    }
-  },
-
-  async checkAvailableFeatures() {
-    try {
-      const token = AuthService.getAuthToken();
-      if (!token) throw new Error("Non authentifié");
-
-      const response = await fetch(`${SUBSCRIPTION_API_URL}/features`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur checkAvailableFeatures:", error);
-      throw error;
-    }
-  },
-
+  
   /**
    * 🔥 Lance la session de paiement Stripe
    * @param {"monthly"|"annual"} plan
