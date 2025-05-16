@@ -1,4 +1,4 @@
-import { Map, Compass, Star, ArrowRight } from "lucide-react";
+import { Map, Compass, Star } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -18,7 +18,7 @@ export default function HowItWorks() {
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
             Comment ça marche
           </h2>
-          <p className="max-w-2xl mx-auto text-sm sm:text-base md:text-lg text-gray-600 leading-relaxed sm:leading-relaxed">
+          <p className="max-w-2xl mx-auto text-sm text-gray-600 leading-relaxed sm:leading-relaxed">
             Planifier votre road trip parfait n’a jamais été aussi simple avec{" "}
             <span className="text-primary font-medium">ROADTRIP!</span>
           </p>
@@ -63,7 +63,7 @@ export default function HowItWorks() {
               </div>
               <div className="pt-12">
                 <h4 className="text-lg sm:text-xl font-semibold mb-4">{step.title}</h4>
-                <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
+                <p className="text-gray-600 text-sm leading-relaxed sm:leading-relaxed">
                   {step.description}
                 </p>
                 <div className="mt-6 flex justify-center opacity-70 group-hover:opacity-100 transition-opacity">
@@ -79,7 +79,6 @@ export default function HowItWorks() {
           <Link href="/explorer">
             <Button>
               Commencer l'aventure
-              <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Button>
           </Link>
         </div>

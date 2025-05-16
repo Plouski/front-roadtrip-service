@@ -2,14 +2,9 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   Check,
-  Plane,
   Star,
-  Shield,
-  Clock,
   MapPin,
   Download,
-  Headphones,
-  Sparkles,
 } from "lucide-react";
 
 export default function PremiumFeatures() {
@@ -48,7 +43,7 @@ export default function PremiumFeatures() {
             </span>{" "}
             Premium
           </h2>
-          <p className="max-w-2xl mx-auto">
+          <p className="text-sm leading-relaxed sm:leading-relaxed">
             Débloquez toutes les fonctionnalités et vivez une expérience de
             voyage exceptionnelle.
           </p>
@@ -73,7 +68,7 @@ export default function PremiumFeatures() {
                     <div className="h-6 w-6 mr-3 mt-0.5 flex items-center justify-center rounded-full bg-green-50">
                       <Check className="h-3.5 w-3.5 text-green-600" />
                     </div>
-                    <span className="text-gray-700">{item}</span>
+                    <span className="text-gray-700 text-sm leading-relaxed sm:leading-relaxed">{item}</span>
                   </li>
                 ))}
               </ul>
@@ -112,7 +107,7 @@ export default function PremiumFeatures() {
                     >
                       <Icon className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-gray-700">{text}</span>
+                    <span className="text-gray-700 text-sm leading-relaxed sm:leading-relaxed">{text}</span>
                   </li>
                 ))}
               </ul>
@@ -148,7 +143,7 @@ export default function PremiumFeatures() {
                     >
                       <Icon className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-gray-700">{text}</span>
+                    <span className="text-gray-700 text-sm leading-relaxed sm:leading-relaxed">{text}</span>
                   </li>
                 ))}
               </ul>

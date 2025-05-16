@@ -20,7 +20,7 @@ export default function Hero() {
           Votre prochaine <span className="text-primary">aventure</span>{" "}
           commence ici
         </h1>
-        <p className="mb-10 max-w-2xl text-sm sm:text-base md:text-lg text-white/90 leading-relaxed sm:leading-relaxed">
+        <p className="mb-10 max-w-2xl text-smtext-white/90 leading-relaxed sm:leading-relaxed">
           Découvrez des itinéraires uniques, planifiez votre road trip idéal et
           créez des souvenirs inoubliables.
         </p>

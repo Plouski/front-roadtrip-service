@@ -29,7 +29,7 @@ export default function PopularRoadtrips({
             <Filter className="h-8 w-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold">Aucun roadtrip trouvé</h3>
-          <p className="text-sm sm:text-base md:text-lg text-gray-500 max-w-md mx-auto mb-5">
+          <p className="text-sm text-gray-600 max-w-md mx-auto mb-5 leading-relaxed sm:leading-relaxed">
             Essayez d'ajuster vos critères de recherche pour découvrir nos
             itinéraires incroyables.
           </p>
