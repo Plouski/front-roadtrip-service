@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Filter, Map } from "lucide-react";
+import { Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RoadTripCard from "@/components/road-trip-card";
 import Loading from "../ui/loading";
@@ -7,42 +7,54 @@ import Loading from "../ui/loading";
 interface PopularRoadtripsProps {
   roadtrips: any[];
   loading: boolean;
-  onResetFilters: () => void;
 }
 
 export default function PopularRoadtrips({
   roadtrips,
   loading,
-  onResetFilters,
 }: PopularRoadtripsProps) {
+  const popularRoadtrips = roadtrips?.slice(0, 3) || [];
+
   return (
     <section>
-      <div className="flex items-center group mb-5">
-        <div className="h-10 w-1.5 bg-gradient-to-b from-primary to-primary/40 rounded-full mr-4 group-hover:scale-y-110 transition-transform"></div>
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">Road trips populaires</h2>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center group">
+          <div className="h-10 w-1.5 bg-gradient-to-b from-primary to-primary/40 rounded-full mr-4 group-hover:scale-y-110 transition-transform"></div>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+            Road trips populaires
+          </h2>
+        </div>
+        <Link href="/explorer">
+          <Button>
+            Explorer les roadtrips
+            <Map className="ml-2 h-5 w-5" />
+          </Button>
+        </Link>
       </div>
+
       {loading ? (
         <Loading text="Chargement des roadtrips..." />
-      ) : roadtrips.length === 0 ? (
-        <div className="rounded-xl p-12 text-center border border-gray-100 ">
+      ) : popularRoadtrips.length === 0 ? (
+        <div className="rounded-xl p-12 text-center border border-gray-100">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-6 shadow-inner">
-            <Filter className="h-8 w-8 text-gray-400" />
+            <Map className="h-8 w-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-semibold">Aucun roadtrip trouvé</h3>
+          <h3 className="text-lg font-semibold">Aucun roadtrip populaire</h3>
           <p className="text-sm text-gray-600 max-w-md mx-auto mb-5 leading-relaxed sm:leading-relaxed">
-            Essayez d'ajuster vos critères de recherche pour découvrir nos
-            itinéraires incroyables.
+            Il n'y a pas encore de roadtrips populaires disponibles pour le
+            moment.
           </p>
-          <Button variant="outline" onClick={onResetFilters}>
-            Réinitialiser les filtres
-          </Button>
+          <Link href="/explorer">
+            <Button>
+              Explorer les roadtrips
+              <Map className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {roadtrips.slice(0, 6).map((trip) => (
-            <div
-              key={trip.id}
-            >
+          {popularRoadtrips.map((trip) => (
+            <div key={trip.id}>
               <RoadTripCard
                 id={trip.id}
                 title={trip.title}
@@ -60,16 +72,6 @@ export default function PopularRoadtrips({
               />
             </div>
           ))}
-        </div>
-      )}
-      {roadtrips.length > 0 && !loading && (
-        <div className="mt-5 text-center">
-          <Link href="/explorer">
-            <Button variant="outline">
-              Explorer tous les itinéraires
-              <Map className="ml-3 h-5 w-5" />
-            </Button>
-          </Link>
         </div>
       )}
     </section>

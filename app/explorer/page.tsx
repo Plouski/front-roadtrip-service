@@ -23,7 +23,7 @@ export default function ExplorerPage() {
   const fetchRoadtrips = async () => {
     setLoading(true);
     try {
-      const allTrips = await RoadtripService.getAllPublicRoadtrips();
+      const allTrips = await RoadtripService.getPublicRoadtrips();
       let filtered = allTrips;
       let activeFiltersCount = 0;
 

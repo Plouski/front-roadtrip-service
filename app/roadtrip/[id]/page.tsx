@@ -8,24 +8,12 @@ import { AuthService } from "@/services/auth-service"
 import { AdminService } from "@/services/admin-service"
 import LoginPromptModal from "@/components/ui/login-prompt-modal"
 import jsPDF from "jspdf"
-
-import {
-  RoadTripHero,
-  RoadTripItinerary,
-  PremiumItineraryLocked,
-  PremiumItineraryUnlocked,
-  PointsOfInterest,
-  RoadTripSidebar,
-  LoadingState,
-  ErrorState,
-  NotFoundState
-} from "@/components/roadtrip-component"
+import { RoadTripHero, RoadTripItinerary, PremiumItineraryLocked, PointsOfInterest, RoadTripSidebar, LoadingState, NotFoundState} from "@/components/roadtrip-component"
 
 export default function RoadTripPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
-
   const [roadTrip, setRoadTrip] = useState<any>(null)
   const [userRole, setUserRole] = useState<string>("visitor")
   const [canAccessPremium, setCanAccessPremium] = useState<boolean>(false)
@@ -76,6 +64,7 @@ export default function RoadTripPage() {
     loadRoadtrip();
   }, [id])
 
+  {/* Favoris */}
   const handleAddToFavorites = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -88,6 +77,7 @@ export default function RoadTripPage() {
     setFavorite(!favorite)
   }
 
+  {/* Delete (for admin) */}
   const handleDelete = async () => {
     const confirmed = confirm("Voulez-vous vraiment supprimer ce roadtrip ?")
     if (!confirmed) return
@@ -100,6 +90,7 @@ export default function RoadTripPage() {
     }
   }
 
+  {/* Share */}
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
@@ -113,6 +104,7 @@ export default function RoadTripPage() {
     }
   }
 
+  {/* Generate PDF */}
   const generatePdf = () => {
     const doc = new jsPDF()
     let y = 10
@@ -156,7 +148,6 @@ export default function RoadTripPage() {
   }
 
   if (isLoading) return <LoadingState />
-  if (error) return <ErrorState error={error} />
   if (!roadTrip) return <NotFoundState />
 
   return (
@@ -166,6 +157,7 @@ export default function RoadTripPage() {
       <RoadTripHero
         image={roadTrip.image}
         title={roadTrip.title}
+        description={roadTrip.description}
         country={roadTrip.country}
         region={roadTrip.region}
         duration={roadTrip.duration}
@@ -178,10 +170,10 @@ export default function RoadTripPage() {
       <div className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           <div className="lg:col-span-2 space-y-10">
-            <section className="prose max-w-none">
+            {/* <section className="prose max-w-none">
               <h2 className="text-xl font-semibold text-foreground mb-2">Description</h2>
               <p className="text-muted-foreground text-base leading-7">{roadTrip.description}</p>
-            </section>
+            </section> */}
 
             {roadTrip.pointsOfInterest?.length > 0 && (
               <PointsOfInterest points={roadTrip.pointsOfInterest} />
@@ -193,8 +185,8 @@ export default function RoadTripPage() {
 
             {roadTrip.isPremium && roadTrip.itinerary?.length > 0 && (
               canAccessPremium
-                ? <PremiumItineraryUnlocked itinerary={roadTrip.itinerary} />
-                : <PremiumItineraryLocked itinerary={roadTrip.itinerary} />
+                ? <RoadTripItinerary itinerary={roadTrip.itinerary} />
+                : <PremiumItineraryLocked />
             )}
           </div>
 

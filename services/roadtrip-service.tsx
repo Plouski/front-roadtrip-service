@@ -192,13 +192,7 @@ export const RoadtripService = {
   },
 
   async getPublicRoadtrips() {
-    const res = await fetch(`${API_GATEWAY_URL}/roadtrips/public`)
-    if (!res.ok) throw new Error("Erreur lors du chargement des roadtrips publics")
-    return await res.json()
-  },
-
-  async getAllPublicRoadtrips() {
-    const res = await fetch(`${API_GATEWAY_URL}/roadtrips/public`, {
+    const res = await fetch(`${API_GATEWAY_URL}/roadtrips`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json"
@@ -211,6 +205,22 @@ export const RoadtripService = {
 
     const data = await res.json()
     return data.trips // 👈 récupère bien la liste à l'intérieur de `trips`
+  },
+
+  async getPopularRoadtrips() {
+    const res = await fetch(`${API_GATEWAY_URL}/roadtrips/popular`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    })
+
+    if (!res.ok) {
+      throw new Error("Erreur lors de la récupération des roadtrips populaires")
+    }
+
+    const data = await res.json()
+    return data.trips
   },
 
 };
