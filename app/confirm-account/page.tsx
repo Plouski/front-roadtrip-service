@@ -6,6 +6,7 @@ import { AlertMessage } from "@/components/ui/alert-message";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { AuthService } from "@/services/auth-service";
+import Loading from "@/components/ui/loading";
 
 export default function ConfirmAccountPage() {
   const searchParams = useSearchParams();
@@ -38,13 +39,12 @@ export default function ConfirmAccountPage() {
       <h1 className="text-3xl font-bold mb-4">Confirmation de compte</h1>
 
       {loading ? (
-        <div className="flex flex-col items-center space-y-4 animate-pulse text-muted-foreground">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <p>Vérification du lien en cours...</p>
-        </div>
+        <Loading text="Vérification du lien en cours... " />
       ) : (
         <div className="flex flex-col items-center space-y-6 max-w-md">
-          {status === "success" && <CheckCircle className="text-green-600 w-12 h-12" />}
+          {status === "success" && (
+            <CheckCircle className="text-green-600 w-12 h-12" />
+          )}
           {status === "error" && <XCircle className="text-red-600 w-12 h-12" />}
 
           <AlertMessage type={status!} message={message} />
