@@ -170,10 +170,6 @@ export default function RoadTripPage() {
       <div className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           <div className="lg:col-span-2 space-y-10">
-            {/* <section className="prose max-w-none">
-              <h2 className="text-xl font-semibold text-foreground mb-2">Description</h2>
-              <p className="text-muted-foreground text-base leading-7">{roadTrip.description}</p>
-            </section> */}
 
             {roadTrip.pointsOfInterest?.length > 0 && (
               <PointsOfInterest points={roadTrip.pointsOfInterest} />
