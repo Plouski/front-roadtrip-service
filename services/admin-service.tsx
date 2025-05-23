@@ -69,7 +69,7 @@ export const AdminService = {
   async getUsers(page = 1, limit = 10, search = "") {
     const headers = await AuthService.getAuthHeaders();
 
-    const url = `${API_GATEWAY_URL}/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+    const url = `${API_GATEWAY_URL}/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -91,7 +91,7 @@ export const AdminService = {
     try {
       const headers = await AuthService.getAuthHeaders();
 
-      const response = await fetch(`${API_GATEWAY_URL}/users/status/${userId}`, {
+      const response = await fetch(`${API_GATEWAY_URL}/admin/users/status/${userId}`, {
         method: "PUT",
         headers,
         body: JSON.stringify({ isVerified })
@@ -121,7 +121,7 @@ export const AdminService = {
   async getUserById(userId: string) {
     const headers = await AuthService.getAuthHeaders();
 
-    const response = await fetch(`${API_GATEWAY_URL}/users/${userId}`, {
+    const response = await fetch(`${API_GATEWAY_URL}/admin/users/${userId}`, {
       method: "GET",
       headers,
     });
@@ -140,7 +140,7 @@ export const AdminService = {
   async updateUser(userId: string, userData: any) {
     const headers = await AuthService.getAuthHeaders();
 
-    const response = await fetch(`${API_GATEWAY_URL}/users/${userId}`, {
+    const response = await fetch(`${API_GATEWAY_URL}/admin/users/${userId}`, {
       method: "PUT",
       headers,
       body: JSON.stringify(userData), // envoie direct des champs à mettre à jour
@@ -160,7 +160,7 @@ export const AdminService = {
   async deleteUser(userId: string) {
     const headers = await AuthService.getAuthHeaders();
 
-    const response = await fetch(`${API_GATEWAY_URL}/users/${userId}`, {
+    const response = await fetch(`${API_GATEWAY_URL}/admin/users/${userId}`, {
       method: "DELETE",
       headers,
     });

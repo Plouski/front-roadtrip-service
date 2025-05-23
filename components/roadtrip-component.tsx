@@ -8,13 +8,12 @@ import {
   Lock,
   Heart,
   Share2,
-  Filter,
+  TriangleAlert,
   Download,
 } from "lucide-react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import Loading from "./ui/loading";
 
 {
   /* Hero */
@@ -283,14 +282,11 @@ export const RoadTripSidebar = ({
 
         {/* Boutons */}
         <div className="space-y-2 md:space-y-3 bg-white rounded-lg md:rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 hover:shadow transition-shadow">
-
           {/* Share */}
           <Button variant="outline" onClick={handleShare}>
             Partager
             <Share2 className="ml-2 h-4 w-4 md:h-5 md:w-5" />
           </Button>
-
-          
 
           {/* Afficher les boutons d'export uniquement pour les utilisateurs premium ou admin ou si le roadtrip n'est pas premium */}
           {(canAccessPremium || !roadTrip.isPremium) && (
@@ -324,17 +320,9 @@ export const RoadTripSidebar = ({
                   href={`/admin/roadtrip/update/${roadTrip._id}`}
                   className="col-span-1"
                 >
-                  <Button
-                    variant="outline"
-                  >
-                    Modifier
-                  </Button>
+                  <Button variant="outline">Modifier</Button>
                 </Link>
-                <Button
-                  onClick={handleDelete}
-                >
-                  Supprimer
-                </Button>
+                <Button onClick={handleDelete}>Supprimer</Button>
               </div>
             </div>
           )}
@@ -344,38 +332,9 @@ export const RoadTripSidebar = ({
   );
 };
 
-{/* Loading */}
-export const LoadingState = () => {
-  return (
-    <Loading text="Chargement des détails du roadtrip..." />
-  );
-};
-
-{/* Not Found */}
-export const NotFoundState = () => {
-  return (
-    <div className="container py-8 md:py-16 max-w-xs sm:max-w-sm md:max-w-md mx-auto">
-      <div className="bg-primary/5 border border-primary/10 rounded-lg md:rounded-xl p-6 md:p-8 text-center shadow-sm">
-        <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-primary/10 mb-3 md:mb-4">
-          <Filter className="h-6 w-6 md:h-7 md:w-7 text-primary/80" />
-        </div>
-        <h1 className="text-lg md:text-xl font-bold mb-2 md:mb-3 text-gray-800">
-          Itinéraire non trouvé
-        </h1>
-        <p className="text-gray-600 text-sm leading-relaxed sm:leading-relaxed mb-5">
-          L'itinéraire que vous recherchez n'existe pas ou a été supprimé.
-        </p>
-        <Link href="/">
-          <Button>
-            Retour à l'accueil
-          </Button>
-        </Link>
-      </div>
-    </div>
-  );
-};
-
-{/* Generate PDF */}
+{
+  /* Generate PDF */
+}
 export const generateRoadtripPdf = async (fileName = "roadtrip") => {
   const input = document.getElementById("roadtrip-pdf");
   if (!input) return;

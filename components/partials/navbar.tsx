@@ -134,7 +134,7 @@ export default function Navbar() {
         {/* Actions utilisateur (desktop) */}
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated && isAdmin && (
-            <Link href="/admin/dashboard">
+            <Link href="/admin">
               <Button
                 variant="outline"
                 size="sm"

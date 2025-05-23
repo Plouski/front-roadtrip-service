@@ -1,25 +1,32 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { AdminService } from "@/services/admin-service"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AdminService } from "@/services/admin-service";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Pagination,
   PaginationContent,
@@ -27,9 +34,9 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination"
-import { Badge } from "@/components/ui/badge"
-import { AlertMessage } from "@/components/ui/alert-message"
+} from "@/components/ui/pagination";
+import { Badge } from "@/components/ui/badge";
+import { AlertMessage } from "@/components/ui/alert-message";
 import {
   Loader2,
   MoreVertical,
@@ -39,88 +46,111 @@ import {
   Check,
   X,
   Search,
-  Plus,
-} from "lucide-react"
+} from "lucide-react";
+
+type User = {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: "user" | "premium" | "admin";
+  isVerified: boolean;
+};
+
+type AlertType = "success" | "error" | null;
 
 export default function UsersListPage() {
-  const router = useRouter()
-  const [users, setUsers] = useState([])
-  const [totalUsers, setTotalUsers] = useState(0)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [alertMessage, setAlertMessage] = useState("")
-  const [alertType, setAlertType] = useState(null)
+  const router = useRouter();
 
+  const [users, setUsers] = useState<User[]>([]);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
+  const [search, setSearch] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [alertMessage, setAlertMessage] = useState<string>("");
+  const [alertType, setAlertType] = useState<AlertType>(null);
+
+  // Chargement des utilisateurs au changement de page ou de recherche
   useEffect(() => {
-    loadUsers()
-  }, [page, search])
+    loadUsers();
+  }, [page, search]);
 
-  const loadUsers = async () => {
-    setIsLoading(true)
+  // Fonction pour charger les utilisateurs depuis l’API
+  const loadUsers = async (): Promise<void> => {
+    setIsLoading(true);
     try {
-      const res = await AdminService.getUsers(page, 10, search)
-      setUsers(res.users)
-      setTotalUsers(res.total)
+      const res = await AdminService.getUsers(page, 10, search);
+      setUsers(res.users);
+      setTotalUsers(res.total);
     } catch (error) {
-      showAlert("Erreur lors du chargement des utilisateurs", "error")
+      showAlert("Erreur lors du chargement des utilisateurs", "error");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  const toggleStatus = async (userId, currentStatus) => {
+  // Fonction pour activer ou désactiver un utilisateur
+  const toggleStatus = async (
+    userId: string,
+    currentStatus: boolean
+  ): Promise<void> => {
     try {
-      setIsProcessing(true)
-      await AdminService.updateUserStatus(userId, !currentStatus)
-      setUsers(prev =>
-        prev.map(u => (u._id === userId ? { ...u, isVerified: !currentStatus } : u))
-      )
-      showAlert("Statut mis à jour", "success")
+      setIsProcessing(true);
+      await AdminService.updateUserStatus(userId, !currentStatus);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u._id === userId ? { ...u, isVerified: !currentStatus } : u
+        )
+      );
+      showAlert("Statut mis à jour", "success");
     } catch (error) {
-      showAlert("Échec de mise à jour du statut", "error")
+      showAlert("Échec de mise à jour du statut", "error");
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
-  const deleteUser = async (userId) => {
+  // Fonction pour supprimer un utilisateur
+  const deleteUser = async (userId: string): Promise<void> => {
+    if (!confirm("Voulez-vous vraiment supprimer cet utilisateur ?")) return;
+    setIsProcessing(true);
     try {
-      setIsProcessing(true)
-      await AdminService.deleteUser(userId)
-
-      await loadUsers()
-
-      showAlert("Utilisateur supprimé", "success")
+      await AdminService.deleteUser(userId);
+      await loadUsers();
+      showAlert("Utilisateur supprimé", "success");
     } catch (error) {
-      showAlert("Erreur lors de la suppression", "error")
+      showAlert("Erreur lors de la suppression", "error");
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
-  const showAlert = (message, type) => {
-    setAlertMessage(message)
-    setAlertType(type)
+  // Affiche un message d’alerte temporaire
+  const showAlert = (message: string, type: AlertType): void => {
+    setAlertMessage(message);
+    setAlertType(type);
     setTimeout(() => {
-      setAlertMessage("")
-      setAlertType(null)
-    }, 4000)
-  }
+      setAlertMessage("");
+      setAlertType(null);
+    }, 4000);
+  };
 
   return (
     <div className="container">
+      {/* En-tête */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
       </div>
 
-      {alertMessage &&
+      {/* Message d’alerte */}
+      {alertMessage && (
         <div className="mb-6">
           <AlertMessage message={alertMessage} type={alertType} />
         </div>
-      }
+      )}
 
+      {/* Barre de recherche */}
       <div className="flex items-center gap-2 mb-4">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -133,6 +163,7 @@ export default function UsersListPage() {
         </div>
       </div>
 
+      {/* Liste des utilisateurs */}
       <Card>
         <CardHeader>
           <CardTitle>Utilisateurs</CardTitle>
@@ -151,6 +182,7 @@ export default function UsersListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Affichage du loader ou des utilisateurs */}
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-10">
@@ -164,31 +196,38 @@ export default function UsersListPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map(user => (
-                    <TableRow key={user._id || user.id}>
-                      <TableCell>{user.firstName} {user.lastName}</TableCell>
+                  users.map((user) => (
+                    <TableRow key={user._id}>
+                      <TableCell>
+                        {user.firstName} {user.lastName}
+                      </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        {user.role === "admin" ? (
-                          <Badge variant="default">
-                            Admin
-                          </Badge>
-                        ) : user.role === "premium" ? (
-                          <Badge variant="success" className="bg-yellow-500 text-white">
-                            Premium
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">
-                            Utilisateur
-                          </Badge>
-                        )}
+                        <Badge
+                          variant={
+                            user.role === "admin"
+                              ? "default"
+                              : user.role === "premium"
+                              ? "premium"
+                              : "outline"
+                          }
+                        >
+                          {user.role === "admin"
+                            ? "Admin"
+                            : user.role === "premium"
+                            ? "Premium"
+                            : "Utilisateur"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.isVerified ? "success" : "secondary"}>
+                        <Badge
+                          variant={user.isVerified ? "success" : "secondary"}
+                        >
                           {user.isVerified ? "Actif" : "Inactif"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
+                        {/* Menu d’actions */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -196,13 +235,26 @@ export default function UsersListPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => router.push(`/admin/user/${user._id}`)}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(`/admin/user/${user._id}`)
+                              }
+                            >
                               <Eye className="mr-2 h-4 w-4" /> Voir
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => router.push(`/admin/user/edit/${user._id}`)}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(`/admin/user/edit/${user._id}`)
+                              }
+                            >
                               <Edit className="mr-2 h-4 w-4" /> Modifier
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleStatus(user._id, user.isVerified)} disabled={isProcessing}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                toggleStatus(user._id, user.isVerified)
+                              }
+                              disabled={isProcessing}
+                            >
                               {user.isVerified ? (
                                 <>
                                   <X className="mr-2 h-4 w-4" /> Désactiver
@@ -214,7 +266,10 @@ export default function UsersListPage() {
                               )}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => deleteUser(user._id)} className="text-red-600">
+                            <DropdownMenuItem
+                              onClick={() => deleteUser(user._id)}
+                              className="text-red-600"
+                            >
                               <Trash2 className="mr-2 h-4 w-4" /> Supprimer
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -227,13 +282,16 @@ export default function UsersListPage() {
             </Table>
           </div>
 
+          {/* Pagination */}
           <div className="mt-4">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setPage(p => Math.max(p - 1, 1))}
-                    className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                    onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                    className={
+                      page === 1 ? "pointer-events-none opacity-50" : ""
+                    }
                   />
                 </PaginationItem>
 
@@ -250,8 +308,12 @@ export default function UsersListPage() {
 
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setPage(p => p + 1)}
-                    className={page >= Math.ceil(totalUsers / 10) ? "pointer-events-none opacity-50" : ""}
+                    onClick={() => setPage((p) => p + 1)}
+                    className={
+                      page >= Math.ceil(totalUsers / 10)
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>
@@ -260,5 +322,5 @@ export default function UsersListPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

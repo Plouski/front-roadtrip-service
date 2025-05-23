@@ -43,8 +43,7 @@ export default function AuthPage(): JSX.Element {
 
     try {
       await AuthService.login(email, password);
-      setAlertMessage("Connexion réussie !");
-      setAlertType("success");
+      showAlert("Connexion réussie !", "success");
 
       setTimeout(() => {
         router.push("/");
@@ -62,8 +61,7 @@ export default function AuthPage(): JSX.Element {
 
     // Vérifie que les deux mots de passe correspondent
     if (password !== passwordConfirm) {
-      setAlertMessage("Les mots de passe ne correspondent pas.");
-      setAlertType("error");
+      showAlert("Les mots de passe ne correspondent pas.", "error");
       return;
     }
 
@@ -72,10 +70,7 @@ export default function AuthPage(): JSX.Element {
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
     if (!strongPasswordRegex.test(password)) {
-      setAlertMessage(
-        "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial."
-      );
-      setAlertType("error");
+      showAlert("Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.", "error");
       return;
     }
 
@@ -83,8 +78,7 @@ export default function AuthPage(): JSX.Element {
 
     try {
       await AuthService.register(email, password, firstName, lastName);
-      setAlertMessage("Inscription réussie ! Vérifiez votre e-mail.");
-      setAlertType("success");
+      showAlert("Inscription réussie ! Vérifiez votre e-mail.", "success");
 
       // Réinitialise les champs après inscription
       setTimeout(() => {
@@ -118,6 +112,16 @@ export default function AuthPage(): JSX.Element {
       setAlertMessage(`Erreur avec ${provider}: ${error.message}`);
       setAlertType("error");
     }
+  };
+
+  // Affiche un message d’alerte temporaire
+  const showAlert = (message: string, type: "success" | "error") => {
+    setAlertMessage(null);
+    setAlertType(null);
+    setTimeout(() => {
+      setAlertMessage(message);
+      setAlertType(type);
+    }, 10);
   };
 
   return (
