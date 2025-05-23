@@ -1,30 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, JSX } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AssistantService } from "@/services/assistant-service";
-import { AuthService } from "@/services/auth-service";
-import {
-  Bot,
-  User,
-  ArrowLeft,
-  Send,
-  Download,
-  Menu,
-  X,
-  ChevronLeft,
-  PlusCircle,
-  History,
-  MessageSquare
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import Link from "next/link";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { AssistantService } from "@/services/assistant-service";
+import { AuthService } from "@/services/auth-service";
 import { useIsMobile } from "@/hooks/use-mobile";
+import Loading from "@/components/ui/loading";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, ChevronLeft } from "lucide-react";
+import Link from "next/link";
+import { MessageBubble } from "@/components/assistant/message-bubble";
+import { TypingIndicator } from "@/components/assistant/typing-indicator";
+import { AssistantSidebar } from "@/components/assistant/assistant-sidebar";
+import { ChatHeader } from "@/components/assistant/chat-header";
+import { SidebarToggle } from "@/components/assistant/sidebar-toggle";
+import { ChatInput } from "@/components/assistant/chat-input";
 
 interface Message {
   _id: string;
@@ -38,143 +33,148 @@ export default function ConversationPage() {
   const router = useRouter();
   const params = useParams();
   const conversationId = params?.conversationId as string;
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [conversationTitle, setConversationTitle] = useState("Conversation");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [conversationTitle, setConversationTitle] = useState("Conversation");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Vérification de l'authentification et du rôle au chargement du composant
-  useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoading(true);
-      try {
-        const { isAuthenticated, role } = await AuthService.checkAuthenticationAndRole();
+  // Fait défiler automatiquement vers le bas des messages
+  const scrollToBottom = useCallback((): void => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
-        if (!isAuthenticated) {
-          console.log("Non authentifié, redirection vers /auth");
-          router.push("/auth");
-          return;
-        }
-
-        if (role !== "premium" && role !== "admin") {
-          console.log(`Rôle ${role} non autorisé, redirection vers /premium`);
-          router.push("/premium");
-          return;
-        }
-
-        // Charger la conversation
-        await loadConversation();
-      } catch (error) {
-        console.error("Erreur lors de la vérification d'authentification:", error);
-        setError("Erreur lors de la vérification de votre accès.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router, conversationId]);
-
-  // Fermer automatiquement la sidebar sur mobile
-  useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(true);
+  // Formate une date pour l'affichage selon le contexte mobile/desktop
+  const formatDate = useCallback((dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      const formatPattern = isMobile ? "d MMM, HH:mm" : "d MMM yyyy à HH:mm";
+      return format(date, formatPattern, { locale: fr });
+    } catch (error) {
+      console.error("Erreur de formatage de date:", error);
+      return "";
     }
   }, [isMobile]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Génère un titre pour la conversation basé sur le premier message utilisateur
+  const generateConversationTitle = useCallback((messagesArray: Message[]): string => {
+    const firstUserMessage = messagesArray.find(msg => msg.role === "user");
+    if (!firstUserMessage) return "Conversation";
 
-  const formatDate = (dateString: string) => {
+    const content = firstUserMessage.content;
+    const maxLength = isMobile ? 25 : 35;
+    return content.length > maxLength 
+      ? `${content.substring(0, maxLength)}...` 
+      : content;
+  }, [isMobile]);
+
+  // Vérifie l'authentification et les permissions de l'utilisateur
+  const checkAuthentication = useCallback(async (): Promise<boolean> => {
     try {
-      const date = new Date(dateString);
-      return format(date, isMobile ? "d MMM, HH:mm" : "d MMM yyyy à HH:mm", { locale: fr });
-    } catch (e) {
-      return "";
-    }
-  };
+      const { isAuthenticated, role } = await AuthService.checkAuthenticationAndRole();
 
-  // Fonction pour charger la conversation
-  const loadConversation = async () => {
-    try {
-      if (!conversationId) return;
-
-      const result = await AssistantService.getConversationById(conversationId);
-
-      // Vérifier si result est un tableau
-      if (Array.isArray(result)) {
-        setMessages(result);
-
-        // Trouver le premier message utilisateur pour le titre
-        const firstUserMessage = result.find(msg => msg.role === "user");
-        if (firstUserMessage) {
-          const content = firstUserMessage.content;
-          const title = content.length > 30 ? `${content.substring(0, 30)}...` : content;
-          setConversationTitle(title);
-        }
-      } else {
-        // Si le résultat n'est pas un tableau, vérifier s'il a une propriété qui contient les messages
-        console.warn("Le résultat de getConversationById n'est pas un tableau:", result);
-
-        // Essayer de trouver des messages dans le résultat (adapter selon votre API)
-        const messagesArray = result.messages || result.data || [];
-
-        if (Array.isArray(messagesArray) && messagesArray.length > 0) {
-          setMessages(messagesArray);
-
-          const firstUserMessage = messagesArray.find(msg => msg.role === "user");
-          if (firstUserMessage) {
-            const content = firstUserMessage.content;
-            const title = content.length > 30 ? `${content.substring(0, 30)}...` : content;
-            setConversationTitle(title);
-          }
-        } else {
-          console.error("Impossible de trouver des messages dans la réponse");
-        }
+      if (!isAuthenticated) {
+        console.log("Utilisateur non authentifié, redirection vers /auth");
+        router.push("/auth");
+        return false;
       }
 
+      if (role !== "premium" && role !== "admin") {
+        console.log(`Rôle ${role} non autorisé pour cette page, redirection vers /premium`);
+        router.push("/premium");
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la vérification d'authentification:", error);
+      setError("Erreur lors de la vérification de votre accès.");
+      return false;
+    }
+  }, [router]);
+
+  // Charge les messages de la conversation depuis l'API
+  const loadConversation = useCallback(async (): Promise<void> => {
+    if (!conversationId) {
+      setError("ID de conversation manquant");
+      return;
+    }
+
+    try {
+      const result = await AssistantService.getConversationById(conversationId);
+      let messagesArray: Message[] = [];
+
+      // Gestion des différents formats de réponse de l'API
+      if (Array.isArray(result)) {
+        messagesArray = result;
+      } else if (result && typeof result === "object") {
+        // Chercher les messages dans différentes propriétés possibles
+        messagesArray = result.messages || result.data || [];
+      }
+
+      if (!Array.isArray(messagesArray)) {
+        console.warn("Format de réponse inattendu:", result);
+        messagesArray = [];
+      }
+
+      setMessages(messagesArray);
+      
+      // Générer le titre de la conversation
+      if (messagesArray.length > 0) {
+        const title = generateConversationTitle(messagesArray);
+        setConversationTitle(title);
+      }
+
+      setError(null);
+
+      // Focus automatique sur le champ de saisie
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
     } catch (err) {
       console.error("Erreur lors du chargement de la conversation:", err);
+      setError("Erreur lors du chargement de la conversation.");
     }
-  };
+  }, [conversationId, generateConversationTitle]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Gère l'envoi d'un nouveau message
+  const handleSubmit = useCallback(async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isSubmitting) return;
 
-    const userMessage = {
+    // Créer le message utilisateur
+    const userMessage: Message = {
       _id: Date.now().toString(),
-      role: "user" as const,
+      role: "user",
       content: input,
       createdAt: new Date().toISOString(),
       conversationId,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Adapter le message pour le composant MessageBubble
+    const userMessageForBubble = {
+      ...userMessage,
+      id: userMessage._id,
+    };
+
+    // Ajouter le message à l'état et vider le champ de saisie
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
-      await AssistantService.saveMessage("user", input, conversationId);
+      // Sauvegarder le message utilisateur
+      await AssistantService.saveMessage("user", currentInput, conversationId);
 
-      const result = await AssistantService.askAssistant(input, {
+      // Appeler l'assistant IA
+      const result = await AssistantService.askAssistant(currentInput, {
         location: "Italie",
         duration: 7,
         budget: 1200,
@@ -184,299 +184,225 @@ export default function ConversationPage() {
         conversationId,
       });
 
-      const assistantMessage = {
-        _id: Date.now().toString(),
-        role: "assistant" as const,
+      // Créer le message de réponse de l'assistant
+      const assistantMessage: Message = {
+        _id: (Date.now() + 1).toString(),
+        role: "assistant",
         content: result.reponse || result.message || JSON.stringify(result),
         createdAt: new Date().toISOString(),
         conversationId,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Ajouter la réponse de l'assistant
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Sauvegarder la réponse de l'assistant
       await AssistantService.saveMessage("assistant", assistantMessage.content, conversationId);
+
+      toast.success("Message envoyé avec succès");
     } catch (error) {
-      console.error("Erreur IA:", error);
+      console.error("Erreur lors de l'envoi du message:", error);
+      
+      // Ajouter un message d'erreur
+      const errorMessage: Message = {
+        _id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Une erreur est survenue lors de l'appel à l'IA.\nVeuillez réessayer dans quelques instants.",
+        createdAt: new Date().toISOString(),
+        conversationId,
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      toast.error("Erreur lors de l'envoi du message");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
+      setTimeout(scrollToBottom, 100);
     }
-  };
+  }, [input, isSubmitting, conversationId, scrollToBottom]);
 
-  const handleDownloadPDF = async () => {
-    const input = document.getElementById("pdf-content");
-    if (!input) return;
-
-    const canvas = await html2canvas(input, {
-      scale: 2,
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${conversationTitle || "conversation"}.pdf`);
-
-    // Fermer la sidebar sur mobile après téléchargement
-    if (isMobile) {
-      setSidebarOpen(false);
+  // Gère le téléchargement de la conversation en PDF
+  const handleDownloadPDF = useCallback(async (): Promise<void> => {
+    const element = document.getElementById("pdf-content");
+    if (!element) {
+      toast.error("Impossible de trouver le contenu à exporter");
+      return;
     }
-  };
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
+    toast.info("Génération du PDF en cours...");
 
-  const startNewSession = () => {
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        scrollY: -window.scrollY,
+        backgroundColor: "#fafaf9",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${conversationTitle || "conversation"}-${new Date().toISOString().split("T")[0]}.pdf`);
+
+      if (isMobile) {
+        setSidebarOpen(false);
+      }
+
+      toast.success("PDF téléchargé avec succès");
+    } catch (error) {
+      console.error("Erreur lors de la création du PDF:", error);
+      toast.error("Impossible de générer le PDF");
+    }
+  }, [conversationTitle, isMobile]);
+
+  // Démarre une nouvelle session de conversation
+  const startNewSession = useCallback((): void => {
     router.push("/ai");
-  };
+  }, [router]);
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-stone-50">
-        <div className="text-stone-500 flex flex-col items-center">
-          <div className="mb-4">Chargement de la conversation...</div>
-          <div className="flex space-x-2">
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+  // Gère l'ouverture/fermeture de la sidebar
+  const toggleSidebar = useCallback((): void => {
+    setSidebarOpen(!sidebarOpen);
+  }, [sidebarOpen]);
+
+  // Gère le changement de valeur du champ de saisie
+  const handleInputChange = useCallback((value: string): void => {
+    setInput(value);
+  }, []);
+
+  // Vérification d'authentification et chargement de la conversation
+  useEffect(() => {
+    const initializePage = async (): Promise<void> => {
+      setIsLoading(true);
+      
+      const isAuthenticated = await checkAuthentication();
+      if (isAuthenticated) {
+        await loadConversation();
+      }
+      
+      setIsLoading(false);
+    };
+
+    initializePage();
+  }, [checkAuthentication, loadConversation]);
+
+  // Gestion responsive de la sidebar
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+  }, [isMobile]);
+
+  // Composant pour afficher un message d'erreur
+  const ErrorDisplay = (): JSX.Element => (
+    <div className="flex h-screen flex-col items-center justify-center bg-stone-50 p-4">
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6 max-w-md text-center mb-6 shadow-sm">
+        <MessageSquare className="h-8 w-8 mx-auto mb-3 text-red-500" />
+        <p>{error}</p>
+      </div>
+      <Link href="/ai/history">
+        <Button variant="outline" className="flex items-center gap-2 hover:bg-stone-50">
+          <ChevronLeft className="h-4 w-4" />
+          Retour à l'historique
+        </Button>
+      </Link>
+    </div>
+  );
+
+  // Composant pour afficher les messages avec état vide
+  const MessagesArea = (): JSX.Element => (
+    <div
+      ref={chatContainerRef}
+      id="pdf-content"
+      className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-gradient-to-b from-stone-50 to-stone-100"
+    >
+      {messages.length === 0 ? (
+        <div className="flex justify-center items-center h-40">
+          <div className="text-stone-400 text-center">
+            <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p>Aucun message trouvé dans cette conversation</p>
           </div>
         </div>
-      </div>
-    );
+      ) : (
+        messages.map((message) => (
+          <MessageBubble
+            key={message._id}
+            message={{
+              id: message._id,
+              role: message.role,
+              content: message.content,
+              createdAt: message.createdAt,
+            }}
+            showTimestamp={true}
+            formatDate={formatDate}
+          />
+        ))
+      )}
+
+      {/* Indicateur de frappe pendant l'envoi */}
+      {isSubmitting && <TypingIndicator />}
+
+      {/* Élément pour le scroll automatique */}
+      <div ref={messagesEndRef} />
+    </div>
+  );
+
+  // Affichage du loader pendant le chargement initial
+  if (isLoading) {
+    return <Loading text="Chargement de la conversation..." />;
   }
 
-  // Affichage d'un message d'erreur
+  // Affichage de l'erreur si elle existe
   if (error) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-stone-50 p-4">
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6 max-w-md text-center mb-6">
-          {error}
-        </div>
-        <Link href="/ai/history">
-          <Button variant="outline" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Retour à l'historique
-          </Button>
-        </Link>
-      </div>
-    );
+    return <ErrorDisplay />;
   }
 
   return (
     <div className="flex h-screen bg-stone-50 overflow-hidden">
-      {/* Sidebar - avec animation de transition */}
-      {(sidebarOpen || !isMobile) && (
-        <aside
-          className={`
-            ${sidebarOpen ? "w-72" : "w-0 md:w-20"} 
-            ${sidebarOpen ? "translate-x-0" : isMobile ? "-translate-x-full" : "translate-x-0"}
-            transition-all duration-300 ease-in-out 
-            flex-shrink-0 border-r border-stone-200 bg-white 
-            flex flex-col h-full
-            ${isMobile ? "fixed z-30" : "relative"}
-          `}
-        >
-          <div className="p-6 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className={`text-xl font-light text-stone-800 flex items-center gap-2 ${!sidebarOpen && "md:hidden"}`}>
-                Assistant ROADTRIP!
-              </h2>
+      {/* Sidebar avec navigation et actions */}
+      <AssistantSidebar
+        isOpen={sidebarOpen}
+        onToggle={toggleSidebar}
+        currentTitle={conversationTitle}
+        showCurrentConversation={true}
+        isMobile={isMobile}
+        onNewConversation={startNewSession}
+        onDownloadPDF={handleDownloadPDF}
+        downloadDisabled={messages.length === 0}
+      />
 
-              {/* Logo minimaliste quand la sidebar est réduite (visible seulement sur desktop) */}
-              <div className={`${sidebarOpen ? "hidden" : "hidden md:flex"} items-center justify-center w-full`}>
-                <span className="text-2xl">✈️</span>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="p-0 h-8 w-8 rounded-full md:hidden"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className={`flex flex-col gap-4 ${!sidebarOpen && "md:items-center"}`}>
-
-              {/* Mettre en évidence la conversation active */}
-              <div
-                className={`${!sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-5 px-4 rounded-xl"
-                  } bg-red-50 text-red-600 border border-red-100 flex items-center gap-2`}
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span className={`${!sidebarOpen && "md:hidden"} text-sm font-medium truncate`}>
-                  {conversationTitle}
-                </span>
-              </div>
-
-              <Button
-                onClick={startNewSession}
-                variant="outline"
-                className={`${!sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-6 rounded-xl"
-                  } border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all flex items-center gap-2 text-stone-700`}
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span className={`${!sidebarOpen && "md:hidden"}`}>Nouvelle conversation</span>
-              </Button>
-
-              <Link href="/ai/history" className="block">
-                <Button
-                  variant="ghost"
-                  className={`${!sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-5 rounded-xl"
-                    } text-stone-600 hover:bg-stone-100 hover:text-stone-800 transition-all flex items-center gap-2`}
-                >
-                  <History className="h-4 w-4" />
-                  <span className={`${!sidebarOpen && "md:hidden"}`}>Historique</span>
-                </Button>
-              </Link>
-
-              <Button
-                onClick={handleDownloadPDF}
-                variant="ghost"
-                className={`${!sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-5 rounded-xl"
-                  } text-stone-600 hover:bg-stone-100 hover:text-stone-800 transition-all flex items-center gap-2`}
-              >
-                <Download className="h-4 w-4" />
-                <span className={`${!sidebarOpen && "md:hidden"}`}>Télécharger PDF</span>
-              </Button>
-
-
-            </div>
-
-            <div className={`mt-auto pt-6 border-t border-stone-100 ${!sidebarOpen && "md:hidden"}`}>
-              <p className="text-xs text-stone-500 italic">
-                Votre compagnon de voyage intelligent
-              </p>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* Overlay pour fermer le menu sur mobile */}
-      {sidebarOpen && isMobile && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
-          onClick={() => setSidebarOpen(false)}
+      {/* Zone de chat principale */}
+      <div className="flex-1 flex flex-col w-full">
+        {/* Header du chat */}
+        <ChatHeader
+          title={conversationTitle}
+          subtitle={isSubmitting ? "En train de réfléchir..." : "Conversation active"}
+          showMenuButton={(!sidebarOpen || isMobile)}
+          onMenuClick={toggleSidebar}
+          showHistoryButton={true}
+          isMobile={isMobile}
+          isLoading={isSubmitting}
         />
-      )}
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header avec bouton menu pour mobile ou desktop fermé */}
-        <header className={`bg-white border-b border-stone-200 p-4 shadow-sm flex items-center`}>
-          {(!sidebarOpen || isMobile) && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="p-1 mr-3"
-            >
-              <Menu className="h-6 w-6 text-stone-700" />
-            </Button>
-          )}
+        {/* Bouton de fermeture de la sidebar (desktop) */}
+        <SidebarToggle
+          isOpen={sidebarOpen}
+          onClick={toggleSidebar}
+          isMobile={isMobile}
+        />
 
-          <h2 className="text-lg md:text-xl font-light text-stone-800 truncate flex-1">
-            {conversationTitle}
-          </h2>
-        </header>
+        {/* Zone des messages */}
+        <MessagesArea />
 
-        {/* Toggle button pour desktop - uniquement visible quand la sidebar est ouverte */}
-        {sidebarOpen && !isMobile && (
-          <div className="absolute left-72 top-6 z-20 transform -translate-x-1/2 transition-all duration-300 ease-in-out">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="bg-white h-8 w-8 rounded-full border border-stone-200 shadow-sm"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Messages area */}
-        <div className="flex-grow overflow-y-auto">
-          <div
-            id="pdf-content"
-            className="container mx-auto space-y-4 md:space-y-6 p-3 md:p-6"
-          >
-            {messages.length === 0 ? (
-              <div className="flex justify-center items-center h-40">
-                <div className="text-stone-400 text-center">
-                  <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                  <p>Aucun message trouvé dans cette conversation</p>
-                </div>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message._id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`flex max-w-xs sm:max-w-md md:max-w-2xl ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-                  >
-                    <div
-                      className={`p-3 md:p-5 rounded-2xl text-sm md:text-base whitespace-pre-wrap leading-relaxed ${message.role === "assistant"
-                          ? "bg-white text-stone-800 border border-stone-100 shadow-sm"
-                          : "bg-red-600 text-white shadow-md"
-                        }`}
-                    >
-                      {message.content}
-                      <div className={`mt-1 md:mt-2 text-xs ${message.role === "assistant" ? "text-stone-400" : "text-red-100"}`}>
-                        {formatDate(message.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="flex max-w-xs sm:max-w-md md:max-w-2xl flex-row">
-                  <div className="bg-white text-stone-500 p-4 rounded-2xl shadow-sm border border-stone-100 flex items-center gap-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                      <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                      <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* Input area */}
-        <div className="border-t border-stone-200 bg-white shadow-sm">
-          <div className="container mx-auto p-3 md:p-4">
-            <form onSubmit={handleSubmit} className="flex items-center gap-2 md:gap-3">
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={isMobile ? "Votre question..." : "Posez votre question sur votre voyage..."}
-                disabled={isLoading}
-                className="flex-1 text-sm md:text-base py-4 md:py-6 px-3 md:px-4 rounded-xl border border-stone-200 focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-all shadow-sm bg-stone-50"
-              />
-              <Button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="bg-red-500 hover:bg-red-600 text-white p-4 md:p-6 rounded-xl transition-all shadow"
-              >
-                <Send className="h-4 md:h-5 w-4 md:w-5" />
-              </Button>
-            </form>
-          </div>
-        </div>
+        {/* Zone de saisie */}
+        <ChatInput
+          ref={inputRef}
+          value={input}
+          onChange={handleInputChange}
+          onSubmit={handleSubmit}
+          disabled={isSubmitting}
+          isMobile={isMobile}
+        />
       </div>
     </div>
   );

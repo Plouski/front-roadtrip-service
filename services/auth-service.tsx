@@ -373,18 +373,15 @@ export const AuthService = {
     return true;
   },
 
-  async checkAuthenticationAndRole(expectedRoles: string | string[]) {
+  async checkAuthenticationAndRole() {
     const isAuthenticated = await this.checkAuthentication();
-    if (!isAuthenticated) return false;
-
-    const role = await this.getUserRoleAsync();
-    if (!role) return false;
-
-    if (Array.isArray(expectedRoles)) {
-      return expectedRoles.includes(role);
+    if (!isAuthenticated) {
+      return { isAuthenticated: false, role: null };
     }
 
-    return role === expectedRoles;
+    const role = await this.getUserRoleAsync();
+
+    return { isAuthenticated: true, role };
   },
 
   getAuthToken() {

@@ -50,7 +50,7 @@ export default function RoadtripsListPage() {
       setRoadtrips(res.trips);
       setTotal(res.total);
     } catch {
-      showAlert("Erreur lors du chargement", "error");
+      showAlert("Erreur lors du chargement des roadtrips", "error");
     } finally {
       setLoading(false);
     }

@@ -1,62 +1,41 @@
 import { AuthService } from "./auth-service";
-import { redirect } from "next/navigation";
 
+// Configuration de l'URL du service IA
 const AI_SERVICE_URL = process.env.NEXT_PUBLIC_AI_SERVICE_URL || "http://localhost:5003";
 
-// Fonction fetch sécurisée avec redirection si token invalide ou accès refusé (non premium)
-// Fonction fetch sécurisée avec vérification du rôle et récupération de celui-ci si manquant
-async function secureFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
-  try {
-    // Vérifier si un token est disponible
-    const token = AuthService.getAuthToken();
-    if (!token) {
-      console.warn("🔐 Aucun token trouvé, redirection vers /auth");
-      if (typeof window !== "undefined") {
-        window.location.href = "/auth";
-      } else {
-        redirect("/auth");
-      }
-      throw new Error("Redirection vers /auth - Aucun token");
-    }
-
-    // Exécuter la requête
-    const res = await fetch(input, init);
-
-    // Gérer les erreurs d'authentification (token expiré ou invalide)
-    if (res.status === 401) {
-      console.warn("🔐 Token expiré ou invalide, redirection vers /auth");
-      if (typeof window !== "undefined") {
-        window.location.href = "/auth";
-      } else {
-        redirect("/auth");
-      }
-      throw new Error("Redirection vers /auth - Token invalide");
-    }
-
-    return res;
-  } catch (error) {
-    console.error("Erreur dans secureFetch:", error);
-    throw error;
-  }
-}
-
+/**
+ * Service pour interagir avec l'API de l'assistant IA
+ * Gère toutes les communications avec le backend d'intelligence artificielle
+ */
 export const AssistantService = {
-  async askAssistant(query: string, params: any = {}) {
+  /**
+   * Envoie une question à l'assistant IA et récupère la réponse
+   * @param query - La question/prompt à envoyer à l'IA
+   * @param params - Paramètres additionnels pour la requête
+   * @returns La réponse de l'IA
+   */
+  async askAssistant(query: string, params: any = {}): Promise<any> {
     try {
-      //ensureAuthenticatedAndPremium();
       const token = AuthService.getAuthToken();
+      
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
+      
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await secureFetch(`${AI_SERVICE_URL}/api/ai/ask`, {
+      const response = await fetch(`${AI_SERVICE_URL}/api/ai/ask`, {
         method: "POST",
         headers,
         body: JSON.stringify({ prompt: query, ...params }),
       });
+
+      // Vérification des erreurs HTTP
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
 
       return await response.json();
     } catch (error) {
@@ -65,22 +44,32 @@ export const AssistantService = {
     }
   },
 
-  async getDetailedItinerary(options: any) {
+  /**
+   * Récupère un itinéraire détaillé basé sur les options fournies
+   * @param options - Options pour générer l'itinéraire (destination, durée, budget, etc.)
+   * @returns L'itinéraire détaillé généré par l'IA
+   */
+  async getDetailedItinerary(options: any): Promise<any> {
     try {
-      ////ensureAuthenticatedAndPremium();
       const token = AuthService.getAuthToken();
+      
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
+      
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await secureFetch(`${AI_SERVICE_URL}/api/ai/itinerary`, {
+      const response = await fetch(`${AI_SERVICE_URL}/api/ai/itinerary`, {
         method: "POST",
         headers,
         body: JSON.stringify(options),
       });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
 
       return await response.json();
     } catch (error) {
@@ -89,38 +78,56 @@ export const AssistantService = {
     }
   },
 
-  async saveMessage(role: string, content: string, conversationId: string) {
+  /**
+   * Sauvegarde un message dans une conversation
+   * @param role - Le rôle de l'auteur du message ("user" ou "assistant")
+   * @param content - Le contenu du message
+   * @param conversationId - L'ID de la conversation
+   * @returns La confirmation de sauvegarde
+   */
+  async saveMessage(role: string, content: string, conversationId: string): Promise<any> {
     try {
-      ////ensureAuthenticatedAndPremium();
       const token = AuthService.getAuthToken();
 
-      const res = await secureFetch(`${AI_SERVICE_URL}/api/ai/save`, {
+      const response = await fetch(`${AI_SERVICE_URL}/api/ai/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({ role, content, conversationId }),
       });
 
-      return await res.json();
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
     } catch (error) {
       console.error("Erreur AssistantService.saveMessage:", error);
       throw error;
     }
   },
 
-  async getHistory(): Promise<{ id: string; role: string; content: string }[]> {
+  /**
+   * Récupère l'historique des conversations de l'utilisateur
+   * @returns L'historique des conversations groupées par ID de conversation
+   */
+  async getHistory(): Promise<any> {
     try {
-      ////ensureAuthenticatedAndPremium();
       const token = AuthService.getAuthToken();
 
-      const response = await secureFetch(`${AI_SERVICE_URL}/api/ai/history`, {
+      const response = await fetch(`${AI_SERVICE_URL}/api/ai/history`, {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
 
       return await response.json();
     } catch (error) {
@@ -129,17 +136,26 @@ export const AssistantService = {
     }
   },
 
-  async getConversationById(conversationId: string) {
+  /**
+   * Récupère une conversation spécifique par son ID
+   * @param conversationId - L'ID de la conversation à récupérer
+   * @returns Les messages de la conversation
+   */
+  async getConversationById(conversationId: string): Promise<any> {
     try {
-      ////ensureAuthenticatedAndPremium();
       const token = AuthService.getAuthToken();
 
-      const response = await secureFetch(`${AI_SERVICE_URL}/api/ai/conversation/${conversationId}`, {
+      const response = await fetch(`${AI_SERVICE_URL}/api/ai/conversation/${conversationId}`, {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
 
       return await response.json();
     } catch (error) {
@@ -148,22 +164,54 @@ export const AssistantService = {
     }
   },
 
-  async deleteConversation(conversationId: string) {
+  /**
+   * Supprime une conversation spécifique
+   * @param conversationId - L'ID de la conversation à supprimer
+   * @returns Confirmation de suppression
+   */
+  async deleteConversation(conversationId: string): Promise<boolean> {
     try {
-      ////ensureAuthenticatedAndPremium();
       const token = AuthService.getAuthToken();
 
-      await secureFetch(`${AI_SERVICE_URL}/api/ai/conversation/${conversationId}`, {
+      const response = await fetch(`${AI_SERVICE_URL}/api/ai/conversation/${conversationId}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
 
       return true;
     } catch (error) {
       console.error("Erreur AssistantService.deleteConversation:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Vérifie la santé du service IA
+   * @returns Le statut du service
+   */
+  async checkServiceHealth(): Promise<any> {
+    try {
+      const response = await fetch(`${AI_SERVICE_URL}/health`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Service IA indisponible: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Erreur AssistantService.checkServiceHealth:", error);
       throw error;
     }
   },
