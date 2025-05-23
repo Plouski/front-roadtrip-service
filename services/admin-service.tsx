@@ -177,45 +177,21 @@ export const AdminService = {
    * Récupère la liste des roadtrips avec pagination et recherche
    */
   async getRoadtrips(page = 1, limit = 10, search = "") {
-    try {
-      const token = AuthService.getAuthToken();
+    const headers = await AuthService.getAuthHeaders()
 
-      if (!token) {
-        throw new Error("Non authentifié");
-      }
+    const url = `${API_GATEWAY_URL}/admin/roadtrips?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`
 
-      const queryParams = new URLSearchParams({
-        page,
-        limit,
-        ...(search ? { search } : {}),
-        adminView: "true" // <--- C’est ça qui débloque la récupération des roadtrips admin
-      }).toString();
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+    })
 
-      const response = await fetch(`${API_GATEWAY_URL}/roadtrips?${queryParams}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expirée, veuillez vous reconnecter");
-        } else if (response.status === 403) {
-          throw new Error("Vous n'avez pas les autorisations nécessaires");
-        }
-
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erreur lors de la récupération des roadtrips");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur lors de la récupération des roadtrips:", error);
-      return {
-        roadtrips: [],
-        total: 0
-      };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || "Impossible de charger la liste des roadtrips")
     }
+
+    return await response.json()
   },
 
   /**
@@ -237,7 +213,7 @@ export const AdminService = {
         userId: user.id || user.userId, // selon la structure de vos données utilisateur
       };
 
-      const response = await fetch(`${API_GATEWAY_URL}/roadtrips`, {
+      const response = await fetch(`${API_GATEWAY_URL}/admin/roadtrips`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

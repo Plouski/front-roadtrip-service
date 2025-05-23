@@ -253,10 +253,10 @@ export default function Navbar() {
           ) : isAuthenticated ? (
             <>
               {isAdmin && (
-                <Link href="/admin/dashboard" className="block">
+                <Link href="/admin" className="block">
                   <Button
                     variant="outline"
-                    className="w-full text-yellow-800 border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
+                    className="w-full"
                   >
                     <Settings className="mr-2 h-4 w-4" />
                     Administration
