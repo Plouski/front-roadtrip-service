@@ -13,9 +13,7 @@ import {
   RoadTripItinerary,
   PremiumItineraryLocked,
   PointsOfInterest,
-  RoadTripSidebar,
-  LoadingState,
-  NotFoundState,
+  RoadTripSidebar
 } from "@/components/roadtrip-component";
 import { NotFoundMessage } from "@/components/ui/not-found-message";
 import Loading from "@/components/ui/loading";
@@ -76,9 +74,7 @@ export default function RoadTripPage() {
     loadRoadtrip();
   }, [id]);
 
-  {
-    /* Favoris */
-  }
+  // Gestion des favoris
   const handleAddToFavorites = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -91,9 +87,7 @@ export default function RoadTripPage() {
     setFavorite(!favorite);
   };
 
-  {
-    /* Delete (for admin) */
-  }
+  // Suppression (pour admin)
   const handleDelete = async () => {
     const confirmed = confirm("Voulez-vous vraiment supprimer ce roadtrip ?");
     if (!confirmed) return;
@@ -106,9 +100,7 @@ export default function RoadTripPage() {
     }
   };
 
-  {
-    /* Share */
-  }
+  // Partage
   const handleShare = () => {
     if (navigator.share) {
       navigator
@@ -124,9 +116,7 @@ export default function RoadTripPage() {
     }
   };
 
-  {
-    /* Generate PDF */
-  }
+  // Génération PDF
   const generatePdf = () => {
     const doc = new jsPDF();
     let y = 10;
@@ -170,19 +160,26 @@ export default function RoadTripPage() {
   };
 
   if (isLoading)
-    return <Loading text="Chargement des détails du roadtrip..." />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loading text="Chargement des détails du roadtrip..." />
+      </div>
+    );
+    
   if (!roadTrip)
     return (
-      <NotFoundMessage
-        title="Itinéraire introuvable"
-        message="L'itinéraire que vous recherchez n'existe pas ou a été supprimé."
-        linkHref="/"
-        linkLabel="Retour à l'accueil"
-      />
+      <div className="min-h-screen flex items-center justify-center">
+        <NotFoundMessage
+          title="Itinéraire introuvable"
+          message="L'itinéraire que vous recherchez n'existe pas ou a été supprimé."
+          linkHref="/"
+          linkLabel="Retour à l'accueil"
+        />
+      </div>
     );
 
   return (
-    <div className="animate-fadeIn" id="roadtrip-pdf">
+    <div className="min-h-screen animate-fadeIn" id="roadtrip-pdf">
       <LoginPromptModal
         open={showLoginPrompt}
         onClose={() => setShowLoginPrompt(false)}
@@ -201,9 +198,10 @@ export default function RoadTripPage() {
         tags={roadTrip.tags}
       />
 
-      <div className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-10">
+      <div className="container max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 sm:gap-10 lg:gap-12">
+          {/* Contenu principal */}
+          <div className="lg:col-span-2 space-y-8 sm:space-y-12 lg:space-y-16">
             {roadTrip.pointsOfInterest?.length > 0 && (
               <PointsOfInterest points={roadTrip.pointsOfInterest} />
             )}
@@ -221,6 +219,7 @@ export default function RoadTripPage() {
               ))}
           </div>
 
+          {/* Sidebar */}
           <RoadTripSidebar
             roadTrip={roadTrip}
             userRole={userRole}

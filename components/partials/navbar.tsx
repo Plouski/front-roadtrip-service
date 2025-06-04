@@ -7,8 +7,25 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AuthService } from "@/services/auth-service";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import { Menu, X, User, Heart, Map, Home, LogOut, UserCircle, Settings, Sparkles} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Menu,
+  X,
+  User,
+  Heart,
+  Map,
+  Home,
+  LogOut,
+  UserCircle,
+  Settings,
+  Sparkles,
+} from "lucide-react";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -79,8 +96,8 @@ export default function Navbar() {
         scrolled ? "bg-white/95 shadow-sm" : "bg-white border-transparent"
       )}
     >
-      <div className="container flex h-16 items-center justify-between">
-        {/* Logo + Nav desktop */}
+      <div className="container flex h-16 items-center justify-between px-4 sm:px-6">
+        {/* Logo + Desktop Nav */}
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center">
             <div className="hidden sm:block">
@@ -105,7 +122,7 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Navigation principale (desktop) */}
+          {/* Nav Desktop */}
           <nav className="hidden md:flex gap-6">
             {filteredNavItems.map(({ name, href, icon: Icon }) => {
               const isActive = pathname === href;
@@ -131,16 +148,13 @@ export default function Navbar() {
           </nav>
         </div>
 
-        {/* Actions utilisateur (desktop) */}
-        <div className="hidden md:flex items-center gap-4">
+        {/* Actions Desktop */}
+        <div className="hidden md:flex items-center gap-3">
           {isAuthenticated && isAdmin && (
             <Link href="/admin">
-              <Button
-                variant="outline"
-                size="sm"
-              >
+              <Button variant="outline" size="sm">
                 <Settings className="mr-2 h-4 w-4" />
-                Administration
+                Admin
               </Button>
             </Link>
           )}
@@ -150,31 +164,26 @@ export default function Navbar() {
           ) : isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                >
+                <Button variant="outline" size="sm">
                   <UserCircle className="mr-2 h-4 w-4 text-primary" />
-                  <span>Mon compte</span>
+                  Compte
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
-                    Mon profil
+                    Profil
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/favorites" className="flex items-center">
                     <Heart className="mr-2 h-4 w-4" />
-                    Mes favoris
+                    Favoris
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                >
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Déconnexion
                 </DropdownMenuItem>
@@ -182,39 +191,37 @@ export default function Navbar() {
             </DropdownMenu>
           ) : (
             <Link href="/auth">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-gray-200 hover:bg-gray-50 hover:text-primary transition-colors"
-              >
+              <Button variant="outline" size="sm">
                 <User className="mr-2 h-4 w-4" />
                 Connexion
               </Button>
             </Link>
           )}
 
-          {isAuthenticated && (isPremium || isAdmin) ? (
+          {!isAuthenticated || (!isPremium && !isAdmin) ? (
+            <Link href="/premium">
+              <Button className="bg-gradient-to-r from-primary to-primary-700 hover:opacity-90 shadow-sm">
+                Premium
+              </Button>
+            </Link>
+          ) : (
             <Link href="/ai">
               <Button className="bg-gradient-to-r from-primary to-primary-700 hover:opacity-90 shadow-sm">
                 <Sparkles className="mr-2 h-4 w-4" />
                 IA
               </Button>
             </Link>
-          ) : (
-            <Link href="/premium">
-              <Button className="bg-gradient-to-r from-primary to-primary-700 hover:opacity-90 shadow-sm">
-                Premium
-              </Button>
-            </Link>
           )}
         </div>
 
-        {/* Menu burger (mobile) */}
+        {/* Burger Menu Button */}
         <div className="md:hidden">
           <button
             onClick={toggleMenu}
             className="p-2 rounded-md hover:bg-gray-100 transition"
-            aria-label="Toggle menu"
+            aria-label="Menu"
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
           >
             {isMenuOpen ? (
               <X className="h-6 w-6" />
@@ -225,9 +232,12 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Menu mobile */}
+      {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-4 shadow-sm">
+        <div
+          id="mobile-menu"
+          className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-4 shadow-sm"
+        >
           {filteredNavItems.map(({ name, href, icon: Icon }) => (
             <Link
               key={href}
@@ -247,56 +257,67 @@ export default function Navbar() {
 
           <hr />
 
-          {/* Auth + Premium */}
           {isLoading ? (
             <div className="h-8 w-24 rounded-md bg-gray-100 animate-pulse" />
           ) : isAuthenticated ? (
             <>
               {isAdmin && (
-                <Link href="/admin" className="block">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                  >
+                <Link href="/admin" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="outline" className="w-full">
                     <Settings className="mr-2 h-4 w-4" />
-                    Administration
+                    Admin
                   </Button>
                 </Link>
               )}
-
-              <Link href="/profile" className="flex items-center gap-2 text-sm">
+              <Link
+                href="/profile"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-2 text-sm"
+              >
                 <User className="h-4 w-4" /> Mon profil
               </Link>
               <Link
                 href="/favorites"
+                onClick={() => setIsMenuOpen(false)}
                 className="flex items-center gap-2 text-sm"
               >
-                <Heart className="h-4 w-4" /> Mes favoris
+                <Heart className="h-4 w-4" /> Favoris
               </Link>
               <button
-                onClick={handleLogout}
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
                 className="flex items-center gap-2 text-sm text-red-600 hover:underline"
               >
                 <LogOut className="h-4 w-4" /> Déconnexion
               </button>
 
-              {isPremium || isAdmin ? (
-                <Link href="/ai" className="block mt-3">
+              {!isPremium && !isAdmin ? (
+                <Link
+                  href="/premium"
+                  className="block mt-3"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Button className="w-full bg-gradient-to-r from-primary to-primary-700 hover:opacity-90">
+                    Premium
+                  </Button>
+                </Link>
+              ) : (
+                <Link
+                  href="/ai"
+                  className="block mt-3"
+                  onClick={() => setIsMenuOpen(false)}
+                >
                   <Button className="w-full bg-gradient-to-r from-primary to-primary-700 hover:opacity-90">
                     <Sparkles className="mr-2 h-4 w-4" />
                     IA
                   </Button>
                 </Link>
-              ) : (
-                <Link href="/premium" className="block mt-3">
-                  <Button className="w-full bg-gradient-to-r from-primary to-primary-700 hover:opacity-90">
-                    Premium
-                  </Button>
-                </Link>
               )}
             </>
           ) : (
-            <Link href="/auth" className="block">
+            <Link href="/auth" onClick={() => setIsMenuOpen(false)}>
               <Button variant="outline" className="w-full">
                 <User className="mr-2 h-4 w-4" />
                 Connexion

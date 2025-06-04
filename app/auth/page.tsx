@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Facebook, Github } from "lucide-react";
 import { AuthService } from "@/services/auth-service";
 import { AlertMessage } from "@/components/ui/alert-message";
@@ -36,10 +43,32 @@ export default function AuthPage(): JSX.Element {
     checkAuth();
   }, [router]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    const provider = params.get("provider");
+
+    if (error) {
+      let message = "Une erreur inconnue est survenue.";
+
+      if (error === "csrf_failed") {
+        message = `Échec de sécurité CSRF avec ${provider}. Veuillez réessayer.`;
+      } else if (error === "session_invalid") {
+        message = `Session invalide avec ${provider}. Veuillez recommencer.`;
+      } else if (error === "oauth_failed") {
+        message = `La connexion via ${provider} a échoué.`;
+      }
+
+      setAlertMessage(message);
+      setAlertType("error");
+    }
+  }, []);
+
   // Gestion du formulaire de connexion
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    showAlert("Connexion en cours...", "success");
 
     try {
       await AuthService.login(email, password);
@@ -49,8 +78,7 @@ export default function AuthPage(): JSX.Element {
         router.push("/");
       }, 500);
     } catch (error: any) {
-      setAlertMessage(error.message || "Une erreur s'est produite.");
-      setAlertType("error");
+      showAlert(error.message || "Une erreur s'est produite.", "error");
       setIsLoading(false);
     }
   };
@@ -70,11 +98,15 @@ export default function AuthPage(): JSX.Element {
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
     if (!strongPasswordRegex.test(password)) {
-      showAlert("Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.", "error");
+      showAlert(
+        "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.",
+        "error"
+      );
       return;
     }
 
     setIsLoading(true);
+    showAlert("Création du compte en cours...", "success");
 
     try {
       await AuthService.register(email, password, firstName, lastName);
@@ -101,16 +133,14 @@ export default function AuthPage(): JSX.Element {
   const handleSocialLogin = async (provider: string) => {
     try {
       setIsLoading(true);
-      setAlertMessage(`Redirection vers ${provider}...`);
-      setAlertType("success");
+      showAlert(`Redirection vers ${provider}...`, "success");
 
       setTimeout(() => {
         AuthService.socialLogin(provider);
       }, 500);
     } catch (error: any) {
       setIsLoading(false);
-      setAlertMessage(`Erreur avec ${provider}: ${error.message}`);
-      setAlertType("error");
+      showAlert(`Erreur avec ${provider}: ${error.message}`, "error");
     }
   };
 
