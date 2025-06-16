@@ -20,6 +20,7 @@ import { AssistantSidebar } from "@/components/assistant/assistant-sidebar";
 import { ChatHeader } from "@/components/assistant/chat-header";
 import { SidebarToggle } from "@/components/assistant/sidebar-toggle";
 import { ChatInput } from "@/components/assistant/chat-input";
+import { formatAiResponse } from "@/lib/formatAiResponse";
 
 interface Message {
   _id: string;
@@ -51,33 +52,40 @@ export default function ConversationPage() {
   }, []);
 
   // Formate une date pour l'affichage selon le contexte mobile/desktop
-  const formatDate = useCallback((dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      const formatPattern = isMobile ? "d MMM, HH:mm" : "d MMM yyyy à HH:mm";
-      return format(date, formatPattern, { locale: fr });
-    } catch (error) {
-      console.error("Erreur de formatage de date:", error);
-      return "";
-    }
-  }, [isMobile]);
+  const formatDate = useCallback(
+    (dateString: string): string => {
+      try {
+        const date = new Date(dateString);
+        const formatPattern = isMobile ? "d MMM, HH:mm" : "d MMM yyyy à HH:mm";
+        return format(date, formatPattern, { locale: fr });
+      } catch (error) {
+        console.error("Erreur de formatage de date:", error);
+        return "";
+      }
+    },
+    [isMobile]
+  );
 
   // Génère un titre pour la conversation basé sur le premier message utilisateur
-  const generateConversationTitle = useCallback((messagesArray: Message[]): string => {
-    const firstUserMessage = messagesArray.find(msg => msg.role === "user");
-    if (!firstUserMessage) return "Conversation";
+  const generateConversationTitle = useCallback(
+    (messagesArray: Message[]): string => {
+      const firstUserMessage = messagesArray.find((msg) => msg.role === "user");
+      if (!firstUserMessage) return "Conversation";
 
-    const content = firstUserMessage.content;
-    const maxLength = isMobile ? 25 : 35;
-    return content.length > maxLength 
-      ? `${content.substring(0, maxLength)}...` 
-      : content;
-  }, [isMobile]);
+      const content = firstUserMessage.content;
+      const maxLength = isMobile ? 25 : 35;
+      return content.length > maxLength
+        ? `${content.substring(0, maxLength)}...`
+        : content;
+    },
+    [isMobile]
+  );
 
   // Vérifie l'authentification et les permissions de l'utilisateur
   const checkAuthentication = useCallback(async (): Promise<boolean> => {
     try {
-      const { isAuthenticated, role } = await AuthService.checkAuthenticationAndRole();
+      const { isAuthenticated, role } =
+        await AuthService.checkAuthenticationAndRole();
 
       if (!isAuthenticated) {
         console.log("Utilisateur non authentifié, redirection vers /auth");
@@ -86,14 +94,19 @@ export default function ConversationPage() {
       }
 
       if (role !== "premium" && role !== "admin") {
-        console.log(`Rôle ${role} non autorisé pour cette page, redirection vers /premium`);
+        console.log(
+          `Rôle ${role} non autorisé pour cette page, redirection vers /premium`
+        );
         router.push("/premium");
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error("Erreur lors de la vérification d'authentification:", error);
+      console.error(
+        "Erreur lors de la vérification d'authentification:",
+        error
+      );
       setError("Erreur lors de la vérification de votre accès.");
       return false;
     }
@@ -124,7 +137,7 @@ export default function ConversationPage() {
       }
 
       setMessages(messagesArray);
-      
+
       // Générer le titre de la conversation
       if (messagesArray.length > 0) {
         const title = generateConversationTitle(messagesArray);
@@ -144,81 +157,118 @@ export default function ConversationPage() {
   }, [conversationId, generateConversationTitle]);
 
   // Gère l'envoi d'un nouveau message
-  const handleSubmit = useCallback(async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault();
-    if (!input.trim() || isSubmitting) return;
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent): Promise<void> => {
+      e.preventDefault();
+      if (!input.trim() || isSubmitting) return;
 
-    // Créer le message utilisateur
-    const userMessage: Message = {
-      _id: Date.now().toString(),
-      role: "user",
-      content: input,
-      createdAt: new Date().toISOString(),
-      conversationId,
-    };
-
-    // Adapter le message pour le composant MessageBubble
-    const userMessageForBubble = {
-      ...userMessage,
-      id: userMessage._id,
-    };
-
-    // Ajouter le message à l'état et vider le champ de saisie
-    setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
-    setInput("");
-    setIsSubmitting(true);
-
-    try {
-      // Sauvegarder le message utilisateur
-      await AssistantService.saveMessage("user", currentInput, conversationId);
-
-      // Appeler l'assistant IA
-      const result = await AssistantService.askAssistant(currentInput, {
-        location: "Italie",
-        duration: 7,
-        budget: 1200,
-        travelStyle: "détente",
-        includeWeather: true,
-        includeAttractions: true,
-        conversationId,
-      });
-
-      // Créer le message de réponse de l'assistant
-      const assistantMessage: Message = {
-        _id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: result.reponse || result.message || JSON.stringify(result),
+      // Créer le message utilisateur
+      const userMessage: Message = {
+        _id: Date.now().toString(),
+        role: "user",
+        content: input,
         createdAt: new Date().toISOString(),
         conversationId,
       };
 
-      // Ajouter la réponse de l'assistant
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      // Sauvegarder la réponse de l'assistant
-      await AssistantService.saveMessage("assistant", assistantMessage.content, conversationId);
+      // Ajouter le message à l'état et vider le champ de saisie
+      setMessages((prev) => [...prev, userMessage]);
+      const currentInput = input;
+      setInput("");
+      setIsSubmitting(true);
 
-      toast.success("Message envoyé avec succès");
-    } catch (error) {
-      console.error("Erreur lors de l'envoi du message:", error);
-      
-      // Ajouter un message d'erreur
-      const errorMessage: Message = {
-        _id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Une erreur est survenue lors de l'appel à l'IA.\nVeuillez réessayer dans quelques instants.",
-        createdAt: new Date().toISOString(),
-        conversationId,
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
-      toast.error("Erreur lors de l'envoi du message");
-    } finally {
-      setIsSubmitting(false);
-      setTimeout(scrollToBottom, 100);
-    }
-  }, [input, isSubmitting, conversationId, scrollToBottom]);
+      try {
+        // Sauvegarder le message utilisateur
+        await AssistantService.saveMessage(
+          "user",
+          currentInput,
+          conversationId
+        );
+
+        console.log("🚀 ENVOI REQUÊTE IA:", currentInput);
+
+        // Appeler l'assistant IA
+        const result = await AssistantService.askAssistant(currentInput, {
+          includeWeather: true,
+          conversationId,
+        });
+
+        console.log("📥 RÉPONSE BRUTE REÇUE:", result);
+        console.log("📊 TYPE DE RÉPONSE:", typeof result);
+        console.log("🏷️ TYPE DANS OBJET:", result?.type);
+
+        // Vérifier si c'est déjà une string ou un objet
+        let formatted: string;
+
+        if (typeof result === "string") {
+          console.log("⚠️ RÉPONSE DÉJÀ EN STRING — tentative de parsing JSON");
+          try {
+            const parsed = JSON.parse(result);
+            formatted = formatAiResponse(parsed);
+          } catch {
+            console.warn("Impossible de parser la chaîne JSON, on garde brut");
+            formatted = result; // fallback si ce n'est pas du JSON
+          }
+        } else if (result && typeof result === "object") {
+          console.log("✅ FORMATAGE DE L'OBJET");
+          formatted = formatAiResponse(result);
+          console.log(
+            "🎨 RÉSULTAT FORMATÉ:",
+            formatted.substring(0, 200) + "..."
+          );
+        } else {
+          console.log("❌ RÉPONSE INVALIDE");
+          formatted = "❌ Réponse invalide reçue de l'assistant.";
+        }
+
+        // Créer le message de réponse de l'assistant
+        const assistantMessage: Message = {
+          _id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: formatted,
+          createdAt: new Date().toISOString(),
+          conversationId,
+        };
+
+        console.log(
+          "💬 MESSAGE FINAL:",
+          assistantMessage.content.substring(0, 200) + "..."
+        );
+
+        // Ajouter la réponse de l'assistant
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Sauvegarder la réponse de l'assistant
+        await AssistantService.saveMessage(
+          "assistant",
+          formatted,
+          conversationId
+        );
+
+        toast.success("Message envoyé avec succès");
+      } catch (error) {
+        console.error("❌ ERREUR COMPLÈTE:", error);
+
+        // Ajouter un message d'erreur détaillé
+        const errorMessage: Message = {
+          _id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `❌ **Erreur technique**\n\nDétails : ${
+            error instanceof Error ? error.message : "Erreur inconnue"
+          }\n\nVeuillez réessayer dans quelques instants.`,
+          createdAt: new Date().toISOString(),
+          conversationId,
+        };
+
+        setMessages((prev) => [...prev, errorMessage]);
+        toast.error("Erreur lors de l'appel à l'IA");
+      } finally {
+        setIsSubmitting(false);
+        setTimeout(scrollToBottom, 100);
+      }
+    },
+    [input, isSubmitting, conversationId, scrollToBottom]
+  );
 
   // Gère le téléchargement de la conversation en PDF
   const handleDownloadPDF = useCallback(async (): Promise<void> => {
@@ -244,7 +294,11 @@ export default function ConversationPage() {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${conversationTitle || "conversation"}-${new Date().toISOString().split("T")[0]}.pdf`);
+      pdf.save(
+        `${conversationTitle || "conversation"}-${
+          new Date().toISOString().split("T")[0]
+        }.pdf`
+      );
 
       if (isMobile) {
         setSidebarOpen(false);
@@ -276,12 +330,12 @@ export default function ConversationPage() {
   useEffect(() => {
     const initializePage = async (): Promise<void> => {
       setIsLoading(true);
-      
+
       const isAuthenticated = await checkAuthentication();
       if (isAuthenticated) {
         await loadConversation();
       }
-      
+
       setIsLoading(false);
     };
 
@@ -301,7 +355,10 @@ export default function ConversationPage() {
         <p>{error}</p>
       </div>
       <Link href="/ai/history">
-        <Button variant="outline" className="flex items-center gap-2 hover:bg-stone-50">
+        <Button
+          variant="outline"
+          className="flex items-center gap-2 hover:bg-stone-50"
+        >
           <ChevronLeft className="h-4 w-4" />
           Retour à l'historique
         </Button>
@@ -376,8 +433,10 @@ export default function ConversationPage() {
         {/* Header du chat */}
         <ChatHeader
           title={conversationTitle}
-          subtitle={isSubmitting ? "En train de réfléchir..." : "Conversation active"}
-          showMenuButton={(!sidebarOpen || isMobile)}
+          subtitle={
+            isSubmitting ? "En train de réfléchir..." : "Conversation active"
+          }
+          showMenuButton={!sidebarOpen || isMobile}
           onMenuClick={toggleSidebar}
           showHistoryButton={true}
           isMobile={isMobile}

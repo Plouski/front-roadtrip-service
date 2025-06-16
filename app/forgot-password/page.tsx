@@ -33,10 +33,14 @@ export default function PasswordRecoveryPage() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [alertType, setAlertType] = useState<"success" | "error" | null>(null);
 
-  // Affiche une alerte (succès ou erreur)
-  const showAlert = (msg: string, type: "success" | "error") => {
-    setAlertMessage(msg);
-    setAlertType(type);
+  // Affiche une alerte (succès ou erreur) - même fonction que dans AuthPage
+  const showAlert = (message: string, type: "success" | "error") => {
+    setAlertMessage(null);
+    setAlertType(null);
+    setTimeout(() => {
+      setAlertMessage(message);
+      setAlertType(type);
+    }, 10);
   };
 
   /**
@@ -80,7 +84,7 @@ export default function PasswordRecoveryPage() {
       return;
     }
 
-    // Regex pour valider un mot de passe fort
+    // Regex EXACTEMENT identique à celle de AuthPage qui fonctionne
     const strongPasswordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
@@ -93,16 +97,18 @@ export default function PasswordRecoveryPage() {
     }
 
     setIsLoading(true);
+    showAlert("Réinitialisation en cours...", "success");
 
     try {
       await AuthService.resetPassword(email, resetCode, newPassword);
       showAlert("Mot de passe réinitialisé avec succès.", "success");
 
       // Redirection vers la page d'authentification après quelques secondes
-      setTimeout(() => router.push("/auth"), 2000);
-    } catch (err: any) {
-      showAlert(err.message || "Erreur lors de la réinitialisation.", "error");
-    } finally {
+      setTimeout(() => {
+        router.push("/auth");
+      }, 2000);
+    } catch (error: any) {
+      showAlert(error.message || "Erreur lors de la réinitialisation.", "error");
       setIsLoading(false);
     }
   };
@@ -147,7 +153,7 @@ export default function PasswordRecoveryPage() {
 
                   {/* Champ email ou téléphone selon la méthode choisie */}
                   {method === "email" ? (
-                    <div>
+                    <div className="space-y-2">
                       <Label>Email</Label>
                       <Input
                         type="email"
@@ -158,7 +164,7 @@ export default function PasswordRecoveryPage() {
                       />
                     </div>
                   ) : (
-                    <div>
+                    <div className="space-y-2">
                       <Label>Numéro de téléphone</Label>
                       <Input
                         type="tel"
@@ -177,7 +183,7 @@ export default function PasswordRecoveryPage() {
                 <>
                   {/* Email visible seulement pour la méthode SMS */}
                   {method === "sms" && (
-                    <div>
+                    <div className="space-y-2">
                       <Label>Email associé</Label>
                       <Input
                         type="email"
@@ -191,11 +197,14 @@ export default function PasswordRecoveryPage() {
 
                   {/* Affichage de l'email (lecture seule) si méthode = email */}
                   {method === "email" && (
-                    <Input type="email" value={email} readOnly />
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input type="email" value={email} readOnly />
+                    </div>
                   )}
 
                   {/* Saisie du code reçu */}
-                  <div>
+                  <div className="space-y-2">
                     <Label>Code de réinitialisation</Label>
                     <Input
                       type="text"
@@ -206,9 +215,9 @@ export default function PasswordRecoveryPage() {
                     />
                   </div>
 
-                  {/* Saisie du nouveau mot de passe */}
-                  <div>
-                    <Label>Nouveau mot de passe</Label>
+                  {/* Saisie du nouveau mot de passe - EXACTEMENT comme dans AuthPage */}
+                  <div className="space-y-2">
+                    <Label htmlFor="password-register">Nouveau mot de passe</Label>
                     <Input
                       id="password-register"
                       type="password"
@@ -221,9 +230,10 @@ export default function PasswordRecoveryPage() {
                   </div>
 
                   {/* Confirmation du mot de passe */}
-                  <div>
-                    <Label>Confirmer le mot de passe</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="password-confirm">Confirmer le mot de passe</Label>
                     <Input
+                      id="password-confirm"
                       type="password"
                       value={confirmPassword}
                       placeholder="Confirmation du mot de passe"
@@ -239,7 +249,7 @@ export default function PasswordRecoveryPage() {
             <CardFooter className="flex flex-col space-y-4">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <Loading text="Traitement..." />
+                  step === "request" ? "Envoi..." : "Réinitialisation..."
                 ) : (
                   <>
                     <Lock className="mr-2 h-4 w-4" />
