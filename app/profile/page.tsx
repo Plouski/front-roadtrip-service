@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthService } from "@/services/auth-service";
@@ -21,10 +20,15 @@ interface User {
 }
 
 interface Subscription {
-  id: string;
-  plan: string;
-  status: string;
+  _id: string;
+  plan: "free" | "monthly" | "annual" | "premium";
+  status: "active" | "canceled" | "suspended" | "trialing" | "incomplete";
+  isActive: boolean;
   startDate: string;
+  endDate?: string;
+  paymentMethod?: string;
+  cancelationType?: "immediate" | "end_of_period";
+  daysRemaining?: number;
 }
 
 export default function ProfilePage() {
@@ -32,48 +36,65 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
-  
+  const [subscriptionLoading, setSubscriptionLoading] =
+    useState<boolean>(false);
+
   // Messages d'alerte
   const [alertMessage, setAlertMessage] = useState<string>("");
   const [alertType, setAlertType] = useState<"success" | "error" | null>(null);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setIsLoading(true);
-
-        const token = AuthService.getAuthToken();
-        if (!token) {
-          router.push("/auth");
-          return;
-        }
-
-        const userData = await AuthService.getProfile();
-        const currentSub = await SubscriptionService.getCurrentSubscription();
-
-        setUser(userData);
-        setSubscription(currentSub);
-      } catch (error) {
-        console.error("Erreur lors du chargement du profil:", error);
-        setAlertMessage(
-          "Impossible de charger votre profil. Veuillez vous reconnecter."
-        );
-        setAlertType("error");
-        setTimeout(() => {
-          AuthService.logout();
-          router.push("/auth");
-        }, 2000);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchUserData();
   }, [router]);
+
+  const fetchUserData = async () => {
+    try {
+      setIsLoading(true);
+      const token = AuthService.getAuthToken();
+      if (!token) {
+        router.push("/auth");
+        return;
+      }
+
+      // Charger les données utilisateur et abonnement en parallèle
+      const [userData, currentSub] = await Promise.all([
+        AuthService.getProfile(),
+        SubscriptionService.getCurrentSubscription(),
+      ]);
+
+      console.log("🔍 Data loaded from backend:", {
+        userData,
+        currentSub,
+        subStatus: currentSub?.status,
+        subIsActive: currentSub?.isActive,
+        subCancelationType: currentSub?.cancelationType,
+      });
+
+      setUser(userData);
+      setSubscription(currentSub);
+    } catch (error) {
+      console.error("Erreur lors du chargement du profil:", error);
+      setAlertMessage(
+        "Impossible de charger votre profil. Veuillez vous reconnecter."
+      );
+      setAlertType("error");
+      setTimeout(() => {
+        AuthService.logout();
+        router.push("/auth");
+      }, 2000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAlert = (message: string, type: "success" | "error") => {
     setAlertMessage(message);
     setAlertType(type);
+
+    setTimeout(() => {
+      setAlertMessage("");
+      setAlertType(null);
+    }, 5000);
   };
 
   // Gestionnaire de suppression de compte
@@ -81,8 +102,7 @@ export default function ProfilePage() {
     try {
       await AuthService.deleteAccount();
       handleAlert("Votre compte a été supprimé", "success");
-      
-      // Déconnexion et redirection après un délai
+
       setTimeout(() => {
         AuthService.logout();
         router.push("/");
@@ -90,27 +110,188 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Erreur lors de la suppression du compte:", error);
       handleAlert(
-        error instanceof Error ? error.message : "Erreur lors de la suppression du compte",
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la suppression du compte",
         "error"
       );
     }
   };
 
-  // Gestionnaire d'annulation d'abonnement
-  const handleCancelSubscription = async (): Promise<void> => {
+  const handleCancelSubscription = async (
+    immediate: boolean = false
+  ): Promise<void> => {
     try {
-      await SubscriptionService.cancelSubscription();
-      handleAlert("Votre abonnement a été annulé.", "success");
-      setUser(user ? { ...user, role: "user" } : null);
+      setSubscriptionLoading(true);
+
+      const confirmMessage =
+        "Êtes-vous sûr de vouloir annuler votre abonnement ? Vous garderez vos avantages jusqu'à la fin de la période de facturation.";
+
+      const confirmed = window.confirm(confirmMessage);
+      if (!confirmed) return;
+
+      console.log("🔄 Tentative d'annulation...");
+
+      const result = await SubscriptionService.cancelSubscription();
+
+      console.log("✅ Annulation réussie:", result);
+
+      await fetchUserData();
+
+      const message = `Votre abonnement a été annulé.${
+        result.subscription?.endDate
+          ? ` Vous gardez vos avantages jusqu'au ${new Date(
+              result.subscription.endDate
+            ).toLocaleDateString("fr-FR")}.`
+          : ""
+      }`;
+
+      handleAlert(message, "success");
     } catch (error) {
-      console.error("Erreur lors de l'annulation de l'abonnement:", error);
-      handleAlert("Une erreur est survenue lors de l'annulation.", "error");
+      console.error("❌ Erreur lors de l'annulation de l'abonnement:", error);
+
+      let errorMessage = "Une erreur est survenue lors de l'annulation.";
+      if (error instanceof Error) {
+        if (error.message.includes("déjà programmé")) {
+          errorMessage = error.message;
+          await fetchUserData();
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      handleAlert(errorMessage, "error");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handleReactivateSubscription = async (): Promise<void> => {
+    console.log("🔄 handleReactivateSubscription appelé");
+
+    if (!subscription) {
+      handleAlert("Aucun abonnement trouvé à réactiver.", "error");
+      return;
+    }
+
+    if (subscription.status !== "canceled" || !subscription.isActive) {
+      handleAlert("Cet abonnement ne peut pas être réactivé.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Voulez-vous réactiver votre abonnement ? Les prélèvements automatiques reprendront."
+    );
+
+    if (!confirmed) {
+      console.log("Réactivation annulée par l'utilisateur");
+      return;
+    }
+
+    try {
+      setSubscriptionLoading(true);
+
+      const result = await SubscriptionService.reactivateSubscription();
+
+      await fetchUserData();
+
+      handleAlert(
+        "Votre abonnement a été réactivé avec succès ! Les prélèvements automatiques ont repris.",
+        "success"
+      );
+    } catch (error) {
+
+      let errorMessage = "Une erreur est survenue lors de la réactivation.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      handleAlert(errorMessage, "error");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handleChangePlan = async (
+    newPlan: "monthly" | "annual"
+  ): Promise<void> => {
+    try {
+      setSubscriptionLoading(true);
+
+      if (!subscription) {
+        handleAlert("Aucun abonnement trouvé.", "error");
+        return;
+      }
+
+      if (subscription.status !== "active" || !subscription.isActive) {
+        handleAlert(
+          "Seuls les abonnements actifs peuvent être modifiés.",
+          "error"
+        );
+        return;
+      }
+
+      if (subscription.plan === newPlan) {
+        handleAlert(
+          `Vous êtes déjà sur le plan ${
+            newPlan === "monthly" ? "Mensuel" : "Annuel"
+          }.`,
+          "error"
+        );
+        return;
+      }
+
+      const planName = newPlan === "monthly" ? "Mensuel" : "Annuel";
+      const currentPlanName =
+        subscription.plan === "monthly" ? "Mensuel" : "Annuel";
+
+      const confirmed = window.confirm(
+        `Voulez-vous changer du plan ${currentPlanName} vers le plan ${planName} ?\n\n` +
+          `${
+            newPlan === "annual"
+              ? "Avantage : Économisez ~25% par rapport au plan mensuel"
+              : "Note : Le plan mensuel coûte plus cher à l'année"
+          }\n\n` +
+          `La facturation sera ajustée automatiquement.`
+      );
+
+      if (!confirmed) return;
+
+      const result = await SubscriptionService.changePlan(newPlan);
+
+      await fetchUserData();
+
+      const message = `Plan changé avec succès vers ${planName}.`
+
+      handleAlert(message, "success");
+    } catch (error) {
+      console.error("Erreur lors du changement de plan:", error);
+
+      let errorMessage = "Une erreur est survenue lors du changement de plan.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      handleAlert(errorMessage, "error");
+    } finally {
+      setSubscriptionLoading(false);
     }
   };
 
   // Gestionnaire de mise à jour du profil
   const handleUpdateUser = (updatedUser: User): void => {
     setUser(updatedUser);
+    handleAlert("Profil mis à jour avec succès", "success");
+  };
+
+  // Gestionnaire pour aller vers la page premium
+  const handleGoToPremium = (): void => {
+    router.push("/premium");
+  };
+
+  // Gestionnaire pour voir l'historique des paiements
+  const handleViewPaymentHistory = (): void => {
+    router.push("/profile/payments");
   };
 
   if (isLoading) {
@@ -129,18 +310,24 @@ export default function ProfilePage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_3fr] gap-6">
         {/* Sidebar avec avatar et informations de base */}
-        <ProfileSidebar 
-          user={user} 
+        <ProfileSidebar
+          user={user}
+          subscription={subscription}
           onDeleteAccount={handleDeleteAccount}
         />
 
         {/* Sections principales */}
-        <ProfileTabs 
+        <ProfileTabs
           user={user}
           subscription={subscription}
+          subscriptionLoading={subscriptionLoading}
           onAlert={handleAlert}
           onUpdateUser={handleUpdateUser}
           onCancelSubscription={handleCancelSubscription}
+          onReactivateSubscription={handleReactivateSubscription}
+          onChangePlan={handleChangePlan}
+          onGoToPremium={handleGoToPremium}
+          onViewPaymentHistory={handleViewPaymentHistory}
           router={router}
         />
       </div>

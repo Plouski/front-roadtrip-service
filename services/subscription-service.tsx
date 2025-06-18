@@ -49,30 +49,112 @@ export const SubscriptionService = {
     }
   },  
 
+  // Annuler l'abonnement
   async cancelSubscription() {
     try {
       const token = AuthService.getAuthToken();
       if (!token) throw new Error("Non authentifié");
 
-      const response = await fetch(`${SUBSCRIPTION_API_URL}`, {
+      const response = await fetch(`${SUBSCRIPTION_API_URL}/cancel`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
 
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
 
-      return true;
+      return await response.json();
     } catch (error) {
       console.error("Erreur cancelSubscription:", error);
       throw error;
     }
   },
+
+  // Réactiver l'abonnement
+  async reactivateSubscription() {
+    try {
+      const token = AuthService.getAuthToken();
+      if (!token) throw new Error("Non authentifié");
+
+      console.log('🔄 Service: Envoi requête de réactivation...');
+
+      const response = await fetch(`${SUBSCRIPTION_API_URL}/reactivate`, {
+        method: "POST",
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      console.log('🔄 Service: Réponse reçue:', {
+        status: response.status,
+        ok: response.ok
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Service: Erreur réponse:', errorText);
+        throw new Error(errorText);
+      }
+
+      const result = await response.json();
+      console.log('Service: Réactivation réussie:', result);
+      return result;
+      
+    } catch (error) {
+      console.error("Service: Erreur reactivateSubscription:", error);
+      throw error;
+    }
+  },
   
-  /**
-   * 🔥 Lance la session de paiement Stripe
-   * @param {"monthly"|"annual"} plan
-   * @returns {Promise<string>} URL de redirection vers Stripe Checkout
-   */
+  // Changer de plan
+  async changePlan(newPlan) {
+    try {
+      const token = AuthService.getAuthToken();
+      if (!token) throw new Error("Non authentifié");
+
+      if (!["monthly", "annual"].includes(newPlan)) {
+        throw new Error("Plan invalide. Utilisez 'monthly' ou 'annual'");
+      }
+
+      console.log('Service: Envoi requête changement de plan vers', newPlan);
+
+      const response = await fetch(`${SUBSCRIPTION_API_URL}/change-plan`, {
+        method: "PUT",
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ newPlan })
+      });
+
+      console.log('🔄 Service: Réponse changement plan reçue:', {
+        status: response.status,
+        ok: response.ok
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Service: Erreur changement plan:', errorText);
+        throw new Error(errorText);
+      }
+
+      const result = await response.json();
+      console.log('Service: Changement plan réussi:', result);
+      return result;
+      
+    } catch (error) {
+      console.error("Service: Erreur changePlan:", error);
+      throw error;
+    }
+  },
+  
+  // Lancer la session de paiement Stripe
   async startCheckoutSession(plan = "monthly") {
     console.log('SUBSCRIPTION_API_URL', SUBSCRIPTION_API_URL)
     console.log('CHECKOUT_API_URL', CHECKOUT_API_URL)
@@ -97,5 +179,34 @@ export const SubscriptionService = {
       console.error("Erreur startCheckoutSession:", error);
       throw error;
     }
+  },
+
+  formatPlanName(plan) {
+    const planNames = {
+      'free': 'Gratuit',
+      'monthly': 'Mensuel',
+      'annual': 'Annuel',
+      'premium': 'Premium'
+    };
+    return planNames[plan] || plan || 'Inconnu';
+  },
+
+  formatSubscriptionStatus(subscription) {
+    if (!subscription) return "Aucun abonnement";
+    
+    if (subscription.status === 'active' && subscription.isActive) {
+      return "Actif";
+    }
+    
+    if (subscription.status === 'canceled' && subscription.isActive) {
+      const daysRemaining = subscription.daysRemaining;
+      return `Annulé (expire ${daysRemaining && daysRemaining > 0 ? `dans ${daysRemaining} jour${daysRemaining > 1 ? 's' : ''}` : 'bientôt'})`;
+    }
+    
+    if (subscription.status === 'canceled' && !subscription.isActive) {
+      return "Expiré";
+    }
+    
+    return subscription.status;
   }
 };
