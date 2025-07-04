@@ -7,7 +7,7 @@ import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import { AssistantService } from "@/services/assistant-service";
+import { AiService } from "@/services/ai-service";
 import { AuthService } from "@/services/auth-service";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Loading from "@/components/ui/loading";
@@ -120,7 +120,7 @@ export default function ConversationPage() {
     }
 
     try {
-      const result = await AssistantService.getConversationById(conversationId);
+      const result = await AiService.getConversationById(conversationId);
       let messagesArray: Message[] = [];
 
       // Gestion des différents formats de réponse de l'API
@@ -179,7 +179,7 @@ export default function ConversationPage() {
 
       try {
         // Sauvegarder le message utilisateur
-        await AssistantService.saveMessage(
+        await AiService.saveMessage(
           "user",
           currentInput,
           conversationId
@@ -188,7 +188,7 @@ export default function ConversationPage() {
         console.log("🚀 ENVOI REQUÊTE IA:", currentInput);
 
         // Appeler l'assistant IA
-        const result = await AssistantService.askAssistant(currentInput, {
+        const result = await AiService.askAssistant(currentInput, {
           includeWeather: true,
           conversationId,
         });
@@ -239,7 +239,7 @@ export default function ConversationPage() {
         setMessages((prev) => [...prev, assistantMessage]);
 
         // Sauvegarder la réponse de l'assistant
-        await AssistantService.saveMessage(
+        await AiService.saveMessage(
           "assistant",
           formatted,
           conversationId

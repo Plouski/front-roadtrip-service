@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import { AssistantService } from "@/services/assistant-service";
+import { AiService } from "@/services/ai-service";
 import { AuthService } from "@/services/auth-service";
 import { formatAiResponse } from "@/lib/formatAiResponse";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -132,7 +132,7 @@ export default function AssistantPage() {
 
       try {
         // Sauvegarder le message utilisateur
-        await AssistantService.saveMessage(
+        await AiService.saveMessage(
           "user",
           currentInput,
           conversationId
@@ -141,7 +141,7 @@ export default function AssistantPage() {
         console.log("🚀 ENVOI REQUÊTE IA:", currentInput);
 
         // Appeler l'assistant IA
-        const result = await AssistantService.askAssistant(currentInput, {
+        const result = await AiService.askAssistant(currentInput, {
           includeWeather: true,
           conversationId,
         });
@@ -190,7 +190,7 @@ export default function AssistantPage() {
         setMessages((prev) => [...prev, assistantMessage]);
 
         // Sauvegarder la réponse de l'assistant
-        await AssistantService.saveMessage(
+        await AiService.saveMessage(
           "assistant",
           formatted,
           conversationId

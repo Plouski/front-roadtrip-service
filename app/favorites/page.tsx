@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RoadtripService } from "@/services/roadtrip-service";
 import RoadTripCard from "@/components/road-trip-card";
 import { Heart, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import SearchFilters from "@/components/search-bar";
 import Loading from "@/components/ui/loading";
 import Title from "@/components/ui/title";
 import Paragraph from "@/components/ui/paragraph";
+import { FavoriteService } from "@/services/favorites-service";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function FavoritesPage() {
     const fetchFavorites = async () => {
       setLoading(true);
       try {
-        const data = await RoadtripService.getFavoriteRoadtrips();
+        const data = await FavoriteService.getFavorites();
         const favoriteTrips = Array.isArray(data.roadtrips)
           ? data.roadtrips
           : [];

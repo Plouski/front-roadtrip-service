@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { AssistantService } from "@/services/assistant-service";
+import { AiService } from "@/services/ai-service";
 import { AuthService } from "@/services/auth-service";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -111,7 +111,7 @@ export default function HistoryPage() {
   // Charge l'historique des conversations depuis l'API
   const loadHistory = useCallback(async (): Promise<void> => {
     try {
-      const history = await AssistantService.getHistory();
+      const history = await AiService.getHistory();
 
       if (history && typeof history === "object") {
         setGroupedMessages(history);
@@ -163,7 +163,7 @@ export default function HistoryPage() {
     setIsDeleting(conversationToDelete);
 
     try {
-      await AssistantService.deleteConversation(conversationToDelete);
+      await AiService.deleteConversation(conversationToDelete);
 
       setGroupedMessages(prevMessages => {
         const updatedMessages = { ...prevMessages };

@@ -25,17 +25,28 @@ export default function ExplorerPage() {
   const fetchRoadtrips = async () => {
     setLoading(true);
     try {
-      const allTrips = await RoadtripService.getPublicRoadtrips();
+      const response = await RoadtripService.getPublicRoadtrips();
+      
+      const allTrips = response?.trips || [];
+      
+      if (!Array.isArray(allTrips)) {
+        console.error("Les données reçues ne sont pas un array:", allTrips);
+        setRoadtrips([]);
+        return;
+      }
+
       let filtered = allTrips;
       let activeFiltersCount = 0;
 
+      // Filtrage par recherche de texte
       if (searchQuery.trim()) {
         filtered = filtered.filter((trip: { title: string }) =>
-          trip.title.toLowerCase().includes(searchQuery.toLowerCase())
+          trip.title?.toLowerCase().includes(searchQuery.toLowerCase())
         );
         activeFiltersCount++;
       }
 
+      // Filtrage par pays
       if (selectedCountry !== "all") {
         filtered = filtered.filter(
           (trip: { country: string }) => trip.country === selectedCountry
@@ -43,26 +54,31 @@ export default function ExplorerPage() {
         activeFiltersCount++;
       }
 
+      // Filtrage par durée
       if (durationRange !== "all") {
         filtered = filtered.filter((trip: { duration: number }) => {
           if (durationRange === "short") return trip.duration <= 3;
           if (durationRange === "medium")
             return trip.duration > 3 && trip.duration <= 7;
           if (durationRange === "long") return trip.duration > 7;
+          return true;
         });
         activeFiltersCount++;
       }
 
+      // Filtrage par budget
       if (budgetRange !== "all") {
         filtered = filtered.filter((trip: { budget: { amount: number } }) => {
           const amount = trip.budget?.amount || 0;
           if (budgetRange === "low") return amount <= 500;
           if (budgetRange === "medium") return amount > 500 && amount <= 1000;
           if (budgetRange === "high") return amount > 1000;
+          return true;
         });
         activeFiltersCount++;
       }
 
+      // Filtrage par saison
       if (season !== "all") {
         filtered = filtered.filter(
           (trip: { bestSeason: string }) =>
@@ -71,13 +87,15 @@ export default function ExplorerPage() {
         activeFiltersCount++;
       }
 
+      // Filtrage par tag
       if (selectedTag !== "all") {
         filtered = filtered.filter((trip: { tags: string | string[] }) =>
-          trip.tags?.includes(selectedTag)
+          Array.isArray(trip.tags) ? trip.tags.includes(selectedTag) : false
         );
         activeFiltersCount++;
       }
 
+      // Filtrage par statut premium
       if (isPremium !== "all") {
         filtered = filtered.filter(
           (trip: { isPremium: boolean }) =>
@@ -88,8 +106,12 @@ export default function ExplorerPage() {
 
       setActiveFilters(activeFiltersCount);
       setRoadtrips(filtered);
+      
+      console.log(`✅ ${filtered.length} roadtrips chargés avec ${activeFiltersCount} filtres actifs`);
+      
     } catch (error) {
       console.error("Erreur lors du chargement des roadtrips :", error);
+      setRoadtrips([]);
     } finally {
       setLoading(false);
     }
@@ -110,11 +132,17 @@ export default function ExplorerPage() {
     fetchRoadtrips();
   }, []);
 
+  const safeRoadtrips = Array.isArray(roadtrips) ? roadtrips : [];
+
   const allCountries = Array.from(
-    new Set(roadtrips.map((trip) => trip.country))
+    new Set(safeRoadtrips.map((trip) => trip.country).filter(Boolean))
   );
   const allTags = Array.from(
-    new Set(roadtrips.flatMap((trip) => trip.tags || []))
+    new Set(
+      safeRoadtrips
+        .flatMap((trip) => Array.isArray(trip.tags) ? trip.tags : [])
+        .filter(Boolean)
+    )
   );
 
   return (
@@ -180,17 +208,17 @@ export default function ExplorerPage() {
               </div>
             ) : (
               <Paragraph size="sm">
-                {roadtrips.length}{" "}
-                {roadtrips.length > 1 ? "itinéraires trouvés" : "itinéraire trouvé"}
+                {safeRoadtrips.length}{" "}
+                {safeRoadtrips.length > 1 ? "itinéraires trouvés" : "itinéraire trouvé"}
               </Paragraph>
             )}
           </div>
           
-          {roadtrips.length > 0 && !loading && (
+          {safeRoadtrips.length > 0 && !loading && (
             <div className="flex items-center text-sm text-gray-500">
               <Map className="h-4 w-4 mr-2 flex-shrink-0" />
               <span>
-                {Array.from(new Set(roadtrips.map((trip) => trip.country))).length}{" "}
+                {Array.from(new Set(safeRoadtrips.map((trip) => trip.country).filter(Boolean))).length}{" "}
                 pays disponibles
               </span>
             </div>
@@ -202,8 +230,7 @@ export default function ExplorerPage() {
           <div className="flex justify-center py-16 sm:py-20">
             <Loading text="Chargement de vos aventures..." />
           </div>
-        ) : roadtrips.length === 0 ? (
-          // État vide
+        ) : safeRoadtrips.length === 0 ? (
           <div className="rounded-xl sm:rounded-2xl p-8 sm:p-12 lg:p-16 text-center border border-gray-200 bg-white shadow-sm">
             <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 mb-6 sm:mb-8 shadow-inner">
               <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
@@ -234,7 +261,7 @@ export default function ExplorerPage() {
           <>
             {/* Grille des roadtrips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-12 sm:mb-16">
-              {roadtrips.map((trip, index) => (
+              {safeRoadtrips.map((trip, index) => (
                 <div key={trip._id || index} className="h-full">
                   <RoadTripCard
                     id={trip._id}
@@ -252,11 +279,11 @@ export default function ExplorerPage() {
             </div>
 
             {/* CTA en bas pour les grandes listes de résultats */}
-            {roadtrips.length > 9 && (
+            {safeRoadtrips.length > 9 && (
               <div className="flex justify-center">
                 <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 max-w-lg text-center">
                   <Paragraph size="base" className="mb-4 sm:mb-6">
-                    Vous avez découvert {roadtrips.length} destinations
+                    Vous avez découvert {safeRoadtrips.length} destinations
                     incroyables. Trouvez celle qui vous fera rêver !
                   </Paragraph>
                   

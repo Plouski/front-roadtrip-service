@@ -10,7 +10,6 @@ import { Users, Map, BarChart3 } from "lucide-react";
 import RoadtripsListPage from "./roadtrip/page";
 import UsersListPage from "./user/page";
 import PushManager from "@/components/pushManager";
-import MetricsListPage from "./metric/page";
 import DashboardOverview from "./dashboard/page";
 
 interface User {
@@ -99,10 +98,6 @@ export default function AdminDashboard() {
                 <Map className="h-4 w-4" />
                 <span className="hidden sm:inline">Roadtrips</span>
               </TabsTrigger>
-              <TabsTrigger value="metrics" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Métriques</span>
-              </TabsTrigger>
             </TabsList>
 
             {/* Onglet Dashboard - Vue d'ensemble */}
@@ -118,11 +113,6 @@ export default function AdminDashboard() {
             {/* Onglet Roadtrips */}
             <TabsContent value="roadtrips" className="space-y-6">
               <RoadtripsListPage />
-            </TabsContent>
-
-            {/* Onglet Métriques */}
-            <TabsContent value="metrics" className="space-y-6">
-              <MetricsListPage />
             </TabsContent>
           </Tabs>
         </div>
