@@ -1,42 +1,78 @@
-// services/roadtrip-service.js
-
 import { AuthService } from "./auth-service";
 
-const API_GATEWAY_URL = process.env.NEXT_PUBLIC_DB_SERVICE_URL || "https://api.example.com";
+const API_GATEWAY_URL =
+  process.env.NEXT_PUBLIC_DB_SERVICE_URL || "http://localhost:5002";
 
 export const RoadtripService = {
   /**
-   * Récupère tous les roadtrips, avec possibilité de filtrage
+   * Récupère tous les roadtrips publics avec pagination et filtres
    */
-  async getRoadtrips(filters = {}) {
+  async getPublicRoadtrips(params = {}) {
     try {
-      // Créer les paramètres de requête à partir des filtres
       const queryParams = new URLSearchParams();
+      if (params.page) queryParams.append("page", params.page.toString());
+      if (params.limit) queryParams.append("limit", params.limit.toString());
+      if (params.country) queryParams.append("country", params.country);
+      if (params.isPremium !== undefined)
+        queryParams.append("isPremium", params.isPremium.toString());
 
-      if (filters.search) queryParams.set('search', filters.search);
-      if (filters.country) queryParams.set('country', filters.country);
-      if (filters.duration) queryParams.set('duration', filters.duration);
-      if (filters.tags && filters.tags.length) queryParams.set('tags', filters.tags.join(','));
-      if (filters.budget) queryParams.set('budget', filters.budget);
-      if (filters.bestSeason) queryParams.set('bestSeason', filters.bestSeason);
-      if (filters.onlyPremium !== undefined) queryParams.set('onlyPremium', filters.onlyPremium);
+      const url = `${API_GATEWAY_URL}/api/roadtrips${
+        queryParams.toString() ? "?" + queryParams.toString() : ""
+      }`;
 
-      // Pagination
-      if (filters.page) queryParams.set('page', filters.page);
-      if (filters.limit) queryParams.set('limit', filters.limit);
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-      const queryString = queryParams.toString();
-      const url = `${API_GATEWAY_URL}/roadtrips${queryString ? `?${queryString}` : ''}`;
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des roadtrips");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Erreur ${res.status}: ${errorText}`);
       }
 
-      return await response.json();
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Erreur API");
+      }
+
+      return data.data;
     } catch (error) {
-      console.error("Erreur lors de la récupération des roadtrips:", error);
+      console.error("❌ Erreur getPublicRoadtrips:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Récupère les roadtrips populaires
+   */
+  async getPopularRoadtrips(limit = 3) {
+    try {
+      const url = `${API_GATEWAY_URL}/api/roadtrips/popular?limit=${limit}`;
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Erreur ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Erreur API");
+      }
+
+      return data.data.trips;
+    } catch (error) {
+      console.error("❌ Erreur getPopularRoadtrips:", error);
       throw error;
     }
   },
@@ -46,171 +82,153 @@ export const RoadtripService = {
    */
   async getRoadtripById(id) {
     try {
-      const token = AuthService.getAuthToken();
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        throw new Error("ID de roadtrip invalide");
+      }
 
-      const response = await fetch(`${API_GATEWAY_URL}/roadtrips/${id}`, { headers });
+      const token = AuthService.getAuthToken();
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      };
+
+      const url = `${API_GATEWAY_URL}/api/roadtrips/${id}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+      });
+
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Erreur lors de la récupération du roadtrip");
+        throw new Error(
+          result.message || "Erreur lors de la récupération du roadtrip"
+        );
       }
 
       return result.data;
     } catch (error) {
-      console.error(`Erreur lors de la récupération du roadtrip ${id}:`, error);
+      console.error(`❌ Erreur getRoadtripById ${id}:`, error);
       throw error;
     }
   },
 
   /**
-   * Récupère les roadtrips créés par l'utilisateur connecté
+   * Incrémente le compteur de vues avec body JSON
    */
-  async getUserRoadtrips() {
+  async incrementViewCount(id) {
     try {
-      const token = AuthService.getAuthToken();
-
-      if (!token) {
-        throw new Error("Vous devez être connecté pour accéder à vos roadtrips");
+      if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.warn("⚠️ ID invalide pour incrementViewCount:", id);
+        return { views: 0 };
       }
 
-      const response = await fetch(`${API_GATEWAY_URL}/user/roadtrips`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const url = `${API_GATEWAY_URL}/api/roadtrips/${id}/views`;
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération de vos roadtrips");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur lors de la récupération des roadtrips de l'utilisateur:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Ajoute ou retire un roadtrip des favoris
-   */
-  async toggleFavorite(id) {
-    try {
-      const token = AuthService.getAuthToken();
-
-      if (!token) {
-        throw new Error("Vous devez être connecté pour gérer vos favoris");
-      }
-
-      const response = await fetch(`${API_GATEWAY_URL}/roadtrips/${id}/favorite`, {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`
-        }
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la gestion des favoris");
+        const errorText = await response.text();
+        console.warn(
+          `⚠️ HTTP Error incrementViewCount:`,
+          response.status,
+          errorText
+        );
+        return { views: 0 };
       }
 
-      return await response.json();
+      const result = await response.json();
+
+      if (!result.success) {
+        console.warn("⚠️ API Error incrementViewCount:", result.message);
+        return { views: 0 };
+      }
+
+      console.log("✅ View count incremented:", result.data);
+      return result.data;
     } catch (error) {
-      console.error(`Erreur lors de la gestion des favoris pour le roadtrip ${id}:`, error);
-      throw error;
+      console.error(`❌ Erreur incrementViewCount pour ${id}:`, error);
+      return { views: 0 };
     }
   },
 
   /**
-   * Récupère les roadtrips favoris de l'utilisateur
+   * Version alternative si le serveur n'accepte pas de body vide
    */
-  async getFavoriteRoadtrips() {
+  async incrementViewCountAlternative(id) {
     try {
-      const token = AuthService.getAuthToken();
-
-      if (!token) {
-        throw new Error("Vous devez être connecté pour accéder à vos favoris");
+      if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        return { views: 0 };
       }
 
-      const response = await fetch(`${API_GATEWAY_URL}/roadtrips/user/favorites`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const url = `${API_GATEWAY_URL}/api/roadtrips/${id}/views`;
 
-      if (!response.ok) {
-        throw new Error("Erreur lors de la récupération de vos roadtrips favoris");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erreur lors de la récupération des roadtrips favoris:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Publier ou dépublier un roadtrip
-   */
-  async updatePublishStatus(roadtripId, isPublished) {
-    try {
-      const token = AuthService.getAuthToken();
-
-      if (!token) {
-        throw new Error("Vous devez être connecté pour modifier le statut de publication");
-      }
-
-      const response = await fetch(`${API_GATEWAY_URL}/roadtrips/${roadtripId}/publish`, {
-        method: "PATCH",
+      const response = await fetch(url, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ isPublished })
+        body: JSON.stringify({
+          action: "increment_view",
+          timestamp: new Date().toISOString(),
+        }),
       });
 
       if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error("Vous n'avez pas les droits pour modifier ce roadtrip");
-        }
-        throw new Error("Erreur lors de la modification du statut de publication");
+        return { views: 0 };
       }
 
-      return await response.json();
+      const result = await response.json();
+      return result.data || { views: 0 };
     } catch (error) {
-      console.error(`Erreur lors de la modification du statut de publication du roadtrip ${roadtripId}:`, error);
-      throw error;
+      console.error(`❌ incrementViewCountAlternative error:`, error);
+      return { views: 0 };
     }
   },
 
   /**
- * Incrémente le compteur de vues d’un roadtrip
- */
-  async incrementViewCount(id: string) {
-    return await fetch(`${API_GATEWAY_URL}/roadtrips/${id}/view`, {
-      method: "POST"
-    })
-  },
-
-  async getPublicRoadtrips() {
-    const res = await fetch(`${API_GATEWAY_URL}/roadtrips/public`)
-    if (!res.ok) throw new Error("Erreur lors du chargement des roadtrips publics")
-    return await res.json()
-  },
-
-  async getAllPublicRoadtrips() {
-    const res = await fetch(`${API_GATEWAY_URL}/roadtrips/public`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json"
-      }
-    })
-
-    if (!res.ok) {
-      throw new Error("Erreur lors de la récupération des roadtrips publics")
+   * Récupère les roadtrips avec gestion d'erreur pour l'affichage
+   */
+  async getPublicRoadtripsForDisplay() {
+    try {
+      const result = await this.getPublicRoadtrips();
+      return result.trips || [];
+    } catch (error) {
+      console.error("❌ Erreur getPublicRoadtripsForDisplay:", error);
+      return [];
     }
-
-    const data = await res.json()
-    return data.trips // 👈 récupère bien la liste à l'intérieur de `trips`
   },
 
+  /**
+   * Récupère les roadtrips populaires avec gestion d'erreur pour l'affichage
+   */
+  async getPopularRoadtripsForDisplay() {
+    try {
+      const trips = await this.getPopularRoadtrips();
+      return trips || [];
+    } catch (error) {
+      console.error("❌ Erreur getPopularRoadtripsForDisplay:", error);
+      return [];
+    }
+  },
+
+  /**
+   * Test de connectivité API
+   */
+  async checkApiHealth() {
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/ping`);
+      return response.ok;
+    } catch (error) {
+      console.error("❌ API Health check error:", error);
+      return false;
+    }
+  },
 };

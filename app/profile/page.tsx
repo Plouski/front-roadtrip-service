@@ -1,240 +1,306 @@
-"use client"
+"use client";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { AuthService } from "@/services/auth-service";
+import { SubscriptionService } from "@/services/subscription-service";
+import { AlertMessage } from "@/components/ui/alert-message";
+import Loading from "@/components/ui/loading";
+import ProfileSidebar from "@/components/profile/profileSidebar";
+import ProfileTabs from "@/components/profile/profileTabs";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { AlertMessage } from "@/components/ui/alert-message"
-import { AuthService } from "@/services/auth-service"
+interface User {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phoneNumber?: string;
+  role: string;
+  authProvider?: string;
+  createdAt: string;
+}
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Loader2, User, Shield, Key, UserX } from "lucide-react"
-import { SubscriptionService } from "@/services/subscription-service"
+interface Subscription {
+  _id: string;
+  plan: "free" | "monthly" | "annual" | "premium";
+  status: "active" | "canceled" | "suspended" | "trialing" | "incomplete";
+  isActive: boolean;
+  startDate: string;
+  endDate?: string;
+  paymentMethod?: string;
+  cancelationType?: "immediate" | "end_of_period";
+  daysRemaining?: number;
+}
 
 export default function ProfilePage() {
-  const router = useRouter()
-  const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [subscription, setSubscription] = useState(null)
-  const [activeTab, setActiveTab] = useState("profile")
-
-  // Formulaire de profil
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phoneNumber: ""
-  })
-
-  // Formulaire de mot de passe
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: ""
-  })
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] =
+    useState<boolean>(false);
 
   // Messages d'alerte
-  const [alertMessage, setAlertMessage] = useState("")
-  const [alertType, setAlertType] = useState(null)
+  const [alertMessage, setAlertMessage] = useState<string>("");
+  const [alertType, setAlertType] = useState<"success" | "error" | null>(null);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setIsLoading(true)
+    fetchUserData();
+  }, [router]);
 
-        const token = AuthService.getAuthToken()
-        if (!token) {
-          router.push('/auth')
-          return
-        }
-
-        const userData = await AuthService.getProfile()
-        const currentSub = await SubscriptionService.getCurrentSubscription()
-
-        setUser(userData)
-        setSubscription(currentSub)
-
-        setFormData({
-          firstName: userData.firstName || "",
-          lastName: userData.lastName || "",
-          email: userData.email || "",
-          phoneNumber: userData.phoneNumber || ""
-        })
-
-      } catch (error) {
-        console.error("Erreur lors du chargement du profil:", error)
-        setAlertMessage("Impossible de charger votre profil. Veuillez vous reconnecter.")
-        setAlertType("error")
-        setTimeout(() => {
-          AuthService.logout()
-          router.push('/auth')
-        }, 2000)
-      } finally {
-        setIsLoading(false)
+  const fetchUserData = async () => {
+    try {
+      setIsLoading(true);
+      const token = AuthService.getAuthToken();
+      if (!token) {
+        router.push("/auth");
+        return;
       }
-    }
 
-    fetchUserData()
-  }, [router])
+      // Charger les données utilisateur et abonnement en parallèle
+      const [userData, currentSub] = await Promise.all([
+        AuthService.getProfile(),
+        SubscriptionService.getCurrentSubscription(),
+      ]);
 
-  // Gère les changements dans le formulaire de profil
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+      console.log("🔍 Data loaded from backend:", {
+        userData,
+        currentSub,
+        subStatus: currentSub?.status,
+        subIsActive: currentSub?.isActive,
+        subCancelationType: currentSub?.cancelationType,
+      });
 
-  // Gère les changements dans le formulaire de mot de passe
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target
-    setPasswordData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
-
-  // Enregistre les modifications du profil
-  const handleSaveProfile = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    setAlertMessage("")
-
-    try {
-      const updatedUser = await AuthService.updateProfile(formData)
-      setUser(updatedUser)
-      setAlertMessage("Profil mis à jour avec succès")
-      setAlertType("success")
+      setUser(userData);
+      setSubscription(currentSub);
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du profil:", error)
-      setAlertMessage(error.message || "Erreur lors de la mise à jour du profil")
-      setAlertType("error")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Change le mot de passe
-  const handleChangePassword = async (e) => {
-    e.preventDefault()
-
-    // Vérification que les mots de passe correspondent
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setAlertMessage("Les mots de passe ne correspondent pas")
-      setAlertType("error")
-      return
-    }
-
-    setIsChangingPassword(true)
-    setAlertMessage("")
-
-    try {
-      await AuthService.changePassword(
-        passwordData.currentPassword,
-        passwordData.newPassword
-      )
-
-      // Réinitialiser le formulaire
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: ""
-      })
-
-      setAlertMessage("Mot de passe modifié avec succès")
-      setAlertType("success")
-    } catch (error) {
-      console.error("Erreur lors du changement de mot de passe:", error)
-      setAlertMessage(error.message || "Erreur lors du changement de mot de passe")
-      setAlertType("error")
-    } finally {
-      setIsChangingPassword(false)
-    }
-  }
-
-  // Supprime le compte
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true)
-
-    try {
-      await AuthService.deleteAccount()
-
-      // Message de confirmation et déconnexion
-      setAlertMessage("Votre compte a été supprimé")
-      setAlertType("success")
-
-      // Déconnexion et redirection après un délai
+      console.error("Erreur lors du chargement du profil:", error);
+      setAlertMessage(
+        "Impossible de charger votre profil. Veuillez vous reconnecter."
+      );
+      setAlertType("error");
       setTimeout(() => {
-        AuthService.logout()
-        router.push('/')
-      }, 2000)
-    } catch (error) {
-      console.error("Erreur lors de la suppression du compte:", error)
-      setAlertMessage(error.message || "Erreur lors de la suppression du compte")
-      setAlertType("error")
-      setIsDeleting(false)
+        AuthService.logout();
+        router.push("/auth");
+      }, 2000);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
-  const handleCancelSubscription = async () => {
+  const handleAlert = (message: string, type: "success" | "error") => {
+    setAlertMessage(message);
+    setAlertType(type);
+
+    setTimeout(() => {
+      setAlertMessage("");
+      setAlertType(null);
+    }, 5000);
+  };
+
+  // Gestionnaire de suppression de compte
+  const handleDeleteAccount = async (): Promise<void> => {
     try {
-      await SubscriptionService.cancelSubscription()
-      setAlertMessage("Votre abonnement a été annulé.")
-      setAlertType("success")
-      setUser({ ...user, role: "user" })
-  
-      // ⬇️ Revenir à l'onglet "profile"
-      setActiveTab("profile")
+      await AuthService.deleteAccount();
+      handleAlert("Votre compte a été supprimé", "success");
+
+      setTimeout(() => {
+        AuthService.logout();
+        router.push("/");
+      }, 2000);
     } catch (error) {
-      console.error("Erreur lors de l'annulation de l'abonnement:", error)
-      setAlertMessage("Une erreur est survenue lors de l'annulation.")
-      setAlertType("error")
+      console.error("Erreur lors de la suppression du compte:", error);
+      handleAlert(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la suppression du compte",
+        "error"
+      );
     }
-  }  
+  };
 
-  // Affiche un écran de chargement
+  const handleCancelSubscription = async (
+    immediate: boolean = false
+  ): Promise<void> => {
+    try {
+      setSubscriptionLoading(true);
+
+      const confirmMessage =
+        "Êtes-vous sûr de vouloir annuler votre abonnement ? Vous garderez vos avantages jusqu'à la fin de la période de facturation.";
+
+      const confirmed = window.confirm(confirmMessage);
+      if (!confirmed) return;
+
+      console.log("🔄 Tentative d'annulation...");
+
+      const result = await SubscriptionService.cancelSubscription();
+
+      console.log("✅ Annulation réussie:", result);
+
+      await fetchUserData();
+
+      const message = `Votre abonnement a été annulé.${
+        result.subscription?.endDate
+          ? ` Vous gardez vos avantages jusqu'au ${new Date(
+              result.subscription.endDate
+            ).toLocaleDateString("fr-FR")}.`
+          : ""
+      }`;
+
+      handleAlert(message, "success");
+    } catch (error) {
+      console.error("❌ Erreur lors de l'annulation de l'abonnement:", error);
+
+      let errorMessage = "Une erreur est survenue lors de l'annulation.";
+      if (error instanceof Error) {
+        if (error.message.includes("déjà programmé")) {
+          errorMessage = error.message;
+          await fetchUserData();
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      handleAlert(errorMessage, "error");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handleReactivateSubscription = async (): Promise<void> => {
+    console.log("🔄 handleReactivateSubscription appelé");
+
+    if (!subscription) {
+      handleAlert("Aucun abonnement trouvé à réactiver.", "error");
+      return;
+    }
+
+    if (subscription.status !== "canceled" || !subscription.isActive) {
+      handleAlert("Cet abonnement ne peut pas être réactivé.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Voulez-vous réactiver votre abonnement ? Les prélèvements automatiques reprendront."
+    );
+
+    if (!confirmed) {
+      console.log("Réactivation annulée par l'utilisateur");
+      return;
+    }
+
+    try {
+      setSubscriptionLoading(true);
+
+      const result = await SubscriptionService.reactivateSubscription();
+
+      await fetchUserData();
+
+      handleAlert(
+        "Votre abonnement a été réactivé avec succès ! Les prélèvements automatiques ont repris.",
+        "success"
+      );
+    } catch (error) {
+
+      let errorMessage = "Une erreur est survenue lors de la réactivation.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      handleAlert(errorMessage, "error");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handleChangePlan = async (
+    newPlan: "monthly" | "annual"
+  ): Promise<void> => {
+    try {
+      setSubscriptionLoading(true);
+
+      if (!subscription) {
+        handleAlert("Aucun abonnement trouvé.", "error");
+        return;
+      }
+
+      if (subscription.status !== "active" || !subscription.isActive) {
+        handleAlert(
+          "Seuls les abonnements actifs peuvent être modifiés.",
+          "error"
+        );
+        return;
+      }
+
+      if (subscription.plan === newPlan) {
+        handleAlert(
+          `Vous êtes déjà sur le plan ${
+            newPlan === "monthly" ? "Mensuel" : "Annuel"
+          }.`,
+          "error"
+        );
+        return;
+      }
+
+      const planName = newPlan === "monthly" ? "Mensuel" : "Annuel";
+      const currentPlanName =
+        subscription.plan === "monthly" ? "Mensuel" : "Annuel";
+
+      const confirmed = window.confirm(
+        `Voulez-vous changer du plan ${currentPlanName} vers le plan ${planName} ?\n\n` +
+          `${
+            newPlan === "annual"
+              ? "Avantage : Économisez ~25% par rapport au plan mensuel"
+              : "Note : Le plan mensuel coûte plus cher à l'année"
+          }\n\n` +
+          `La facturation sera ajustée automatiquement.`
+      );
+
+      if (!confirmed) return;
+
+      const result = await SubscriptionService.changePlan(newPlan);
+
+      await fetchUserData();
+
+      const message = `Plan changé avec succès vers ${planName}.`
+
+      handleAlert(message, "success");
+    } catch (error) {
+      console.error("Erreur lors du changement de plan:", error);
+
+      let errorMessage = "Une erreur est survenue lors du changement de plan.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      handleAlert(errorMessage, "error");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  // Gestionnaire de mise à jour du profil
+  const handleUpdateUser = (updatedUser: User): void => {
+    setUser(updatedUser);
+    handleAlert("Profil mis à jour avec succès", "success");
+  };
+
+  // Gestionnaire pour aller vers la page premium
+  const handleGoToPremium = (): void => {
+    router.push("/premium");
+  };
+
+  // Gestionnaire pour voir l'historique des paiements
+  const handleViewPaymentHistory = (): void => {
+    router.push("/profile/payments");
+  };
+
   if (isLoading) {
-    return (
-      <div className="container flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
-          <h2 className="text-xl font-semibold">Chargement de votre profil...</h2>
-        </div>
-      </div>
-    )
-  }
-
-  const isOAuthUser = user?.authProvider && user.authProvider !== 'local'
-
-  // Première lettre de chaque nom pour l'avatar
-  const getInitials = () => {
-    const first = formData.firstName?.charAt(0) || '?'
-    const last = formData.lastName?.charAt(0) || '?'
-    return `${first}${last}`.toUpperCase()
+    return <Loading text="Chargement de votre profil..." />;
   }
 
   return (
     <div className="container py-10 max-w-4xl">
-
-      <h1 className="text-3xl font-bold mb-6">Mon Profil</h1>
+      <h1 className="text-3xl font-bold mb-5">Mon Profil</h1>
 
       {alertMessage && (
         <div className="mb-6">
@@ -244,253 +310,27 @@ export default function ProfilePage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_3fr] gap-6">
         {/* Sidebar avec avatar et informations de base */}
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center space-y-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={user?.avatar} alt={`${formData.firstName} ${formData.lastName}`} />
-                  <AvatarFallback className="text-xl">{getInitials()}</AvatarFallback>
-                </Avatar>
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold">{formData.firstName} {formData.lastName}</h2>
-                  <p className="text-sm text-muted-foreground">{formData.email}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Informations du compte */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informations du compte</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="space-y-2 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">Membre depuis</dt>
-                  <dd>{new Date(user?.createdAt).toLocaleDateString()}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Rôle</dt>
-                  <dd className="flex items-center">
-                    <Shield className="h-3.5 w-3.5 mr-1 text-blue-500" />
-                    {user?.role || "Utilisateur"}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
-          {/* Bouton de suppression de compte */}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="w-full">
-                <UserX className="mr-2 h-4 w-4" />
-                Supprimer mon compte
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Êtes-vous absolument sûr?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Cette action est irréversible. Elle supprimera définitivement votre compte
-                  et toutes vos données personnelles de nos serveurs.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteAccount}
-                  disabled={isDeleting}
-                  className="bg-red-500 text-white hover:bg-red-600"
-                >
-                  {isDeleting ? "Suppression..." : "Supprimer définitivement"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+        <ProfileSidebar
+          user={user}
+          subscription={subscription}
+          onDeleteAccount={handleDeleteAccount}
+        />
 
         {/* Sections principales */}
-        <div>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="profile" className="flex items-center">
-                <User className="mr-2 h-4 w-4" />
-                Informations personnelles
-              </TabsTrigger>
-              {!isOAuthUser && (
-                <TabsTrigger value="password" className="flex items-center">
-                  <Key className="mr-2 h-4 w-4" />
-                  Changer de mot de passe
-                </TabsTrigger>
-              )}
-              {user?.role === "premium" && (
-                <TabsTrigger value="subscription" className="flex items-center">
-                  <Shield className="mr-2 h-4 w-4" />
-                  Mon abonnement
-                </TabsTrigger>
-              )}
-
-            </TabsList>
-
-            {/* Onglet informations personnelles */}
-            <TabsContent value="profile">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informations personnelles</CardTitle>
-                  <CardDescription>
-                    Mettez à jour vos informations personnelles ici. Ces informations seront affichées publiquement, alors faites attention à ce que vous partagez.
-                  </CardDescription>
-                </CardHeader>
-                <form onSubmit={handleSaveProfile}>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">Prénom</Label>
-                        <Input
-                          id="firstName"
-                          name="firstName"
-                          value={formData.firstName}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Nom</Label>
-                        <Input
-                          id="lastName"
-                          name="lastName"
-                          value={formData.lastName}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                        disabled
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        L'email ne peut pas être modifié. Contactez le support pour changer d'adresse email.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="phoneNumber">Téléphone (optionnel)</Label>
-                      <Input
-                        id="phoneNumber"
-                        name="phoneNumber"
-                        value={formData.phoneNumber}
-                        onChange={handleInputChange}
-                        placeholder="+33 6 12 34 56 78"
-                      />
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button type="submit" disabled={isSaving}>
-                      {isSaving ? "Enregistrement..." : "Enregistrer les modifications"}
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Card>
-            </TabsContent>
-
-            {/* Onglet changement de mot de passe */}
-            {!isOAuthUser && (
-              <TabsContent value="password">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Changer de mot de passe</CardTitle>
-                    <CardDescription>
-                      Assurez-vous que votre nouveau mot de passe est suffisamment fort et différent des précédents.
-                    </CardDescription>
-                  </CardHeader>
-                  <form onSubmit={handleChangePassword}>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="currentPassword">Mot de passe actuel</Label>
-                        <Input
-                          id="currentPassword"
-                          name="currentPassword"
-                          type="password"
-                          value={passwordData.currentPassword}
-                          onChange={handlePasswordChange}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="newPassword">Nouveau mot de passe</Label>
-                        <Input
-                          id="newPassword"
-                          name="newPassword"
-                          type="password"
-                          value={passwordData.newPassword}
-                          onChange={handlePasswordChange}
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Minimum 8 caractères, incluant au moins une lettre majuscule, une lettre minuscule et un chiffre.
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
-                        <Input
-                          id="confirmPassword"
-                          name="confirmPassword"
-                          type="password"
-                          value={passwordData.confirmPassword}
-                          onChange={handlePasswordChange}
-                          required
-                        />
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Button type="submit" disabled={isChangingPassword}>
-                        {isChangingPassword ? "Modification..." : "Changer le mot de passe"}
-                      </Button>
-                    </CardFooter>
-                  </form>
-                </Card>
-              </TabsContent>
-            )}
-            <TabsContent value="subscription">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Mon abonnement Premium</CardTitle>
-                  <CardDescription>
-                    Gérez votre abonnement, accédez aux options de mise à niveau ou annulez votre abonnement à tout moment.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p>Type de plan : <strong>Premium {user?.subscription?.plan || "mensuel"}</strong></p>
-                  <p>Status : <strong className="text-green-600">Actif</strong></p>
-                  {/* TODO: Ajoute infos dates si tu veux */}
-                </CardContent>
-                <CardFooter className="flex gap-4">
-                  <Button variant="secondary" onClick={() => router.push("/premium")}>
-                    Changer de plan
-                  </Button>
-                  <Button onClick={handleCancelSubscription}>
-                    Annuler mon abonnement
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+        <ProfileTabs
+          user={user}
+          subscription={subscription}
+          subscriptionLoading={subscriptionLoading}
+          onAlert={handleAlert}
+          onUpdateUser={handleUpdateUser}
+          onCancelSubscription={handleCancelSubscription}
+          onReactivateSubscription={handleReactivateSubscription}
+          onChangePlan={handleChangePlan}
+          onGoToPremium={handleGoToPremium}
+          onViewPaymentHistory={handleViewPaymentHistory}
+          router={router}
+        />
       </div>
     </div>
-  )
+  );
 }

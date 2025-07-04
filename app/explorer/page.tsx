@@ -1,133 +1,183 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { RoadtripService } from "@/services/roadtrip-service"
-import RoadTripCard from "@/components/road-trip-card"
-import { Loader2, Filter, Plane, Map, RefreshCcw } from "lucide-react"
-import SearchFilters from "@/components/search-bar"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
+import { RoadtripService } from "@/services/roadtrip-service";
+import RoadTripCard from "@/components/road-trip-card";
+import { Filter, Map, RefreshCcw } from "lucide-react";
+import SearchFilters from "@/components/search-bar";
+import { Button } from "@/components/ui/button";
+import Loading from "@/components/ui/loading";
+import Title from "@/components/ui/title";
+import Paragraph from "@/components/ui/paragraph";
 
 export default function ExplorerPage() {
-  const [roadtrips, setRoadtrips] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCountry, setSelectedCountry] = useState("all")
-  const [durationRange, setDurationRange] = useState("all")
-  const [budgetRange, setBudgetRange] = useState("all")
-  const [season, setSeason] = useState("all")
-  const [selectedTag, setSelectedTag] = useState("all")
-  const [isPremium, setIsPremium] = useState("all")
-  const [activeFilters, setActiveFilters] = useState(0)
+  const [roadtrips, setRoadtrips] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("all");
+  const [durationRange, setDurationRange] = useState("all");
+  const [budgetRange, setBudgetRange] = useState("all");
+  const [season, setSeason] = useState("all");
+  const [selectedTag, setSelectedTag] = useState("all");
+  const [isPremium, setIsPremium] = useState("all");
+  const [activeFilters, setActiveFilters] = useState(0);
 
   const fetchRoadtrips = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const allTrips = await RoadtripService.getAllPublicRoadtrips()
-      let filtered = allTrips
-      let activeFiltersCount = 0
+      const response = await RoadtripService.getPublicRoadtrips();
+      
+      const allTrips = response?.trips || [];
+      
+      if (!Array.isArray(allTrips)) {
+        console.error("Les données reçues ne sont pas un array:", allTrips);
+        setRoadtrips([]);
+        return;
+      }
 
+      let filtered = allTrips;
+      let activeFiltersCount = 0;
+
+      // Filtrage par recherche de texte
       if (searchQuery.trim()) {
-        filtered = filtered.filter(trip =>
-          trip.title.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        activeFiltersCount++
+        filtered = filtered.filter((trip: { title: string }) =>
+          trip.title?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        activeFiltersCount++;
       }
 
+      // Filtrage par pays
       if (selectedCountry !== "all") {
-        filtered = filtered.filter(trip => trip.country === selectedCountry)
-        activeFiltersCount++
+        filtered = filtered.filter(
+          (trip: { country: string }) => trip.country === selectedCountry
+        );
+        activeFiltersCount++;
       }
 
+      // Filtrage par durée
       if (durationRange !== "all") {
-        filtered = filtered.filter(trip => {
-          if (durationRange === "short") return trip.duration <= 3
-          if (durationRange === "medium") return trip.duration > 3 && trip.duration <= 7
-          if (durationRange === "long") return trip.duration > 7
-        })
-        activeFiltersCount++
+        filtered = filtered.filter((trip: { duration: number }) => {
+          if (durationRange === "short") return trip.duration <= 3;
+          if (durationRange === "medium")
+            return trip.duration > 3 && trip.duration <= 7;
+          if (durationRange === "long") return trip.duration > 7;
+          return true;
+        });
+        activeFiltersCount++;
       }
 
+      // Filtrage par budget
       if (budgetRange !== "all") {
-        filtered = filtered.filter(trip => {
-          const amount = trip.budget?.amount || 0
-          if (budgetRange === "low") return amount <= 500
-          if (budgetRange === "medium") return amount > 500 && amount <= 1000
-          if (budgetRange === "high") return amount > 1000
-        })
-        activeFiltersCount++
+        filtered = filtered.filter((trip: { budget: { amount: number } }) => {
+          const amount = trip.budget?.amount || 0;
+          if (budgetRange === "low") return amount <= 500;
+          if (budgetRange === "medium") return amount > 500 && amount <= 1000;
+          if (budgetRange === "high") return amount > 1000;
+          return true;
+        });
+        activeFiltersCount++;
       }
 
+      // Filtrage par saison
       if (season !== "all") {
-        filtered = filtered.filter(trip => trip.bestSeason?.toLowerCase() === season)
-        activeFiltersCount++
+        filtered = filtered.filter(
+          (trip: { bestSeason: string }) =>
+            trip.bestSeason?.toLowerCase() === season
+        );
+        activeFiltersCount++;
       }
 
+      // Filtrage par tag
       if (selectedTag !== "all") {
-        filtered = filtered.filter(trip => trip.tags?.includes(selectedTag))
-        activeFiltersCount++
+        filtered = filtered.filter((trip: { tags: string | string[] }) =>
+          Array.isArray(trip.tags) ? trip.tags.includes(selectedTag) : false
+        );
+        activeFiltersCount++;
       }
 
+      // Filtrage par statut premium
       if (isPremium !== "all") {
-        filtered = filtered.filter(trip => trip.isPremium === (isPremium === "true"))
-        activeFiltersCount++
+        filtered = filtered.filter(
+          (trip: { isPremium: boolean }) =>
+            trip.isPremium === (isPremium === "true")
+        );
+        activeFiltersCount++;
       }
 
-      setActiveFilters(activeFiltersCount)
-      setRoadtrips(filtered)
+      setActiveFilters(activeFiltersCount);
+      setRoadtrips(filtered);
+      
+      console.log(`✅ ${filtered.length} roadtrips chargés avec ${activeFiltersCount} filtres actifs`);
+      
     } catch (error) {
-      console.error("Erreur lors du chargement des roadtrips :", error)
+      console.error("Erreur lors du chargement des roadtrips :", error);
+      setRoadtrips([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const resetFilters = () => {
-    setSearchQuery("")
-    setSelectedCountry("all")
-    setDurationRange("all")
-    setBudgetRange("all")
-    setSeason("all")
-    setSelectedTag("all")
-    setIsPremium("all")
-  }
+    setSearchQuery("");
+    setSelectedCountry("all");
+    setDurationRange("all");
+    setBudgetRange("all");
+    setSeason("all");
+    setSelectedTag("all");
+    setIsPremium("all");
+    fetchRoadtrips();
+  };
 
   useEffect(() => {
-    fetchRoadtrips()
-  }, [searchQuery, selectedCountry, durationRange, budgetRange, season, selectedTag, isPremium])
+    fetchRoadtrips();
+  }, []);
 
-  const allCountries = Array.from(new Set(roadtrips.map(trip => trip.country)))
-  const allTags = Array.from(new Set(roadtrips.flatMap(trip => trip.tags || [])))
+  const safeRoadtrips = Array.isArray(roadtrips) ? roadtrips : [];
+
+  const allCountries = Array.from(
+    new Set(safeRoadtrips.map((trip) => trip.country).filter(Boolean))
+  );
+  const allTags = Array.from(
+    new Set(
+      safeRoadtrips
+        .flatMap((trip) => Array.isArray(trip.tags) ? trip.tags : [])
+        .filter(Boolean)
+    )
+  );
 
   return (
-    <div className="bg-gradient-to-b from-gray-50 to-white">
-      <div className="container py-12 px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2 flex items-center">
-                <Plane className="mr-3 h-6 w-6 text-primary" />
-                Explorer les Roadtrips
-              </h1>
-              <p className="text-gray-600">
-                Découvrez nos itinéraires soigneusement sélectionnés à travers le monde
-              </p>
-            </div>
-            
-            {activeFilters > 0 && (
+    <div className="min-h-screen bg-gray-50">
+      <div className="container py-8 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
+        {/* Section d'en-tête */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6 mb-8 sm:mb-12">
+          <div className="flex-1">
+            <Title level={2} className="mb-3 sm:mb-4">
+              Explorer les Roadtrips
+            </Title>
+            <Paragraph size="base" className="max-w-2xl">
+              Découvrez nos itinéraires soigneusement sélectionnés à travers le
+              monde
+            </Paragraph>
+          </div>
+          
+          {/* Bouton de réinitialisation des filtres */}
+          {activeFilters > 0 && (
+            <div className="flex-shrink-0">
               <Button 
-                variant="outline" 
-                onClick={resetFilters}
-                className="flex items-center gap-2 border-primary text-primary hover:bg-primary/5 self-start"
+                onClick={resetFilters} 
+                variant="outline"
+                className="w-full lg:w-auto flex items-center justify-center gap-2 px-4 py-2"
               >
                 <RefreshCcw className="h-4 w-4" />
-                Réinitialiser les filtres
-                <span className="ml-1 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {activeFilters}
-                </span>
+                <span className="hidden sm:inline">Réinitialiser les filtres</span>
+                <span className="sm:hidden">Réinitialiser</span>
               </Button>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
+        {/* Filtres de recherche */}
+        <div className="mb-8 sm:mb-12">
           <SearchFilters
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -145,59 +195,74 @@ export default function ExplorerPage() {
             setIsPremium={setIsPremium}
             allCountries={allCountries}
             allTags={allTags}
+            onSearch={fetchRoadtrips}
           />
         </div>
 
-        <div className="mb-4 flex justify-between items-center">
+        {/* Résumé des résultats */}
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
           <div className="text-gray-600">
             {loading ? (
-              <span className="flex items-center">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Chargement des roadtrips...
-              </span>
+              <div className="flex items-center gap-2">
+                <Loading text="Chargement des itinéraires..." />
+              </div>
             ) : (
-              <span>
-                {roadtrips.length} {roadtrips.length > 1 ? 'itinéraires trouvés' : 'itinéraire trouvé'}
-              </span>
+              <Paragraph size="sm">
+                {safeRoadtrips.length}{" "}
+                {safeRoadtrips.length > 1 ? "itinéraires trouvés" : "itinéraire trouvé"}
+              </Paragraph>
             )}
           </div>
-
-          {/* Vous pourriez ajouter un filtre de tri ici si nécessaire */}
-          {roadtrips.length > 0 && !loading && (
-            <div className="text-sm text-gray-500">
-              <Map className="inline-block h-4 w-4 mr-1" /> 
-              {Array.from(new Set(roadtrips.map(trip => trip.country))).length} pays disponibles
+          
+          {safeRoadtrips.length > 0 && !loading && (
+            <div className="flex items-center text-sm text-gray-500">
+              <Map className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span>
+                {Array.from(new Set(safeRoadtrips.map((trip) => trip.country).filter(Boolean))).length}{" "}
+                pays disponibles
+              </span>
             </div>
           )}
         </div>
 
+        {/* Contenu principal */}
         {loading ? (
-          <div className="flex justify-center items-center h-80 bg-gray-50 rounded-xl border border-gray-100">
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-              <p className="text-gray-500 animate-pulse">Chargement de vos aventures...</p>
-            </div>
+          <div className="flex justify-center py-16 sm:py-20">
+            <Loading text="Chargement de vos aventures..." />
           </div>
-        ) : roadtrips.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl p-12 text-center border border-gray-100">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-6">
-              <Filter className="h-10 w-10 text-gray-400" />
+        ) : safeRoadtrips.length === 0 ? (
+          <div className="rounded-xl sm:rounded-2xl p-8 sm:p-12 lg:p-16 text-center border border-gray-200 bg-white shadow-sm">
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 mb-6 sm:mb-8 shadow-inner">
+              <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
             </div>
-            <h3 className="text-xl font-medium mb-3">Aucun roadtrip ne correspond à vos critères</h3>
-            <p className="text-gray-500 max-w-md mx-auto mb-8">
-              Essayez d'ajuster vos filtres pour découvrir nos itinéraires incroyables ou explorez-les tous.
-            </p>
+            
+            <Title level={3} className="mb-4">
+              Aucun roadtrip ne correspond à vos critères
+            </Title>
+            
+            <Paragraph 
+              size="sm" 
+              align="center"
+              className="max-w-md mx-auto mb-6 sm:mb-8 px-4 sm:px-0"
+            >
+              Essayez d'ajuster vos filtres pour découvrir nos itinéraires
+              incroyables ou explorez-les tous.
+            </Paragraph>
+            
             <Button 
-              onClick={resetFilters} 
-              className="bg-primary hover:bg-primary-700 text-white"
+              variant="outline" 
+              onClick={resetFilters}
+              className="px-6 py-2.5 sm:py-3"
             >
               Afficher tous les roadtrips
             </Button>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {roadtrips.map((trip, index) => (
+            {/* Grille des roadtrips */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-12 sm:mb-16">
+              {safeRoadtrips.map((trip, index) => (
+                <div key={trip._id || index} className="h-full">
                   <RoadTripCard
                     id={trip._id}
                     title={trip.title}
@@ -209,19 +274,25 @@ export default function ExplorerPage() {
                     tags={trip.tags}
                     isPremium={trip.isPremium}
                   />
+                </div>
               ))}
             </div>
-            
-            {roadtrips.length > 9 && (
-              <div className="flex justify-center mt-12">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 max-w-lg text-center">
-                  <p className="text-gray-700 mb-4">
-                    Vous avez découvert {roadtrips.length} destinations incroyables. Trouvez celle qui vous fera rêver !
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    className="border-primary text-primary hover:bg-primary/5"
+
+            {/* CTA en bas pour les grandes listes de résultats */}
+            {safeRoadtrips.length > 9 && (
+              <div className="flex justify-center">
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 max-w-lg text-center">
+                  <Paragraph size="base" className="mb-4 sm:mb-6">
+                    Vous avez découvert {safeRoadtrips.length} destinations
+                    incroyables. Trouvez celle qui vous fera rêver !
+                  </Paragraph>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      window.scrollTo({ top: 0, behavior: "smooth" })
+                    }
+                    className="border-primary text-primary hover:bg-primary/5 px-6 py-2.5"
                   >
                     Revenir aux filtres
                   </Button>
@@ -232,5 +303,5 @@ export default function ExplorerPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

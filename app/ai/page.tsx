@@ -1,26 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { AssistantService } from "@/services/assistant-service";
-import { AuthService } from "@/services/auth-service";
-import { formatAiResponse } from "@/lib/formatAiResponse";
-import { 
-  Send, 
-  History, 
-  PlusCircle, 
-  Download, 
-  Menu, 
-  X, 
-  ChevronLeft
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import Link from "next/link";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import { AiService } from "@/services/ai-service";
+import { AuthService } from "@/services/auth-service";
+import { formatAiResponse } from "@/lib/formatAiResponse";
+import { useIsMobile } from "@/hooks/use-mobile";
+import Loading from "@/components/ui/loading";
+import { AssistantSidebar } from "@/components/assistant/assistant-sidebar";
+import { ChatHeader } from "@/components/assistant/chat-header";
+import { SidebarToggle } from "@/components/assistant/sidebar-toggle";
+import { MessageBubble } from "@/components/assistant/message-bubble";
+import { TypingIndicator } from "@/components/assistant/typing-indicator";
+import { ChatInput } from "@/components/assistant/chat-input";
 
 interface Message {
   id: string;
@@ -29,413 +24,324 @@ interface Message {
 }
 
 export default function AssistantPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  
-  const isMobile = useIsMobile();
   const router = useRouter();
-
+  const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [includeWeather, setIncludeWeather] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [conversationId, setConversationId] = useState(() =>
+    crypto.randomUUID()
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // Fait défiler automatiquement vers le bas des messages
+  const scrollToBottom = useCallback((): void => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
-  // Vérification d'authentification avec la méthode simplifiée
-  useEffect(() => {
-    const checkAuth = async () => {
-      setIsCheckingAuth(true);
-      try {
-        const { isAuthenticated, role } = await AuthService.checkAuthenticationAndRole();
-        
-        if (!isAuthenticated) {
-          console.log("Non authentifié, redirection vers /auth");
-          router.push("/auth");
-          return;
-        }
-        
-        if (role !== "premium" && role !== "admin") {
-          console.log(`Rôle ${role} non autorisé, redirection vers /premium`);
-          router.push("/premium");
-          return;
-        }
-        
-        // Initialisation du message de bienvenue
-        setMessages([
-          {
-            id: "welcome",
-            role: "assistant",
-            content:
-              "Bonjour ! Je suis votre assistant ROADTRIP!. Posez-moi vos questions sur vos prochains voyages !",
-          },
-        ]);
-        
-        // Focus automatique sur le champ de saisie
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 100);
-      } catch (error) {
-        console.error("Erreur lors de la vérification de l'authentification:", error);
+  // Vérifie l'authentification et les permissions de l'utilisateur
+  const checkAuthentication = useCallback(async (): Promise<void> => {
+    setIsCheckingAuth(true);
+    try {
+      const { isAuthenticated, role } =
+        await AuthService.checkAuthenticationAndRole();
+
+      // Redirection si non authentifié
+      if (!isAuthenticated) {
+        console.log("Utilisateur non authentifié, redirection vers /auth");
         router.push("/auth");
-      } finally {
-        setIsCheckingAuth(false);
+        return;
       }
-    };
 
-    checkAuth();
+      // Vérification des rôles autorisés (admin ou premium)
+      if (role !== "premium" && role !== "admin") {
+        console.log(`Rôle ${role} non autorisé, redirection vers /premium`);
+        router.push("/premium");
+        return;
+      }
+
+      console.log(`Accès autorisé pour le rôle: ${role}`);
+
+      // Initialisation du message de bienvenue
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content:
+            "Bonjour ! Je suis votre assistant ROADTRIP! \nPosez-moi vos questions sur vos prochains voyages !",
+        },
+      ]);
+
+      // Focus automatique sur le champ de saisie
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } catch (error) {
+      console.error(
+        "Erreur lors de la vérification de l'authentification:",
+        error
+      );
+      router.push("/auth");
+    } finally {
+      setIsCheckingAuth(false);
+    }
   }, [router]);
 
-  // Fermer automatiquement la sidebar sur mobile
-  useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(true);
-    }
-  }, [isMobile]);
+  // Démarre une nouvelle session de conversation
+  const startNewSession = useCallback((): void => {
+    const newConversationId = crypto.randomUUID();
+    setConversationId(newConversationId);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const startNewSession = () => {
-    setConversationId(crypto.randomUUID());
     setMessages([
       {
         id: "welcome",
         role: "assistant",
         content:
-          "Nouvelle session démarrée. Je suis prêt à vous aider à planifier votre roadtrip !",
+          "✨ Nouvelle session démarrée !\nJe suis prêt à vous aider à planifier votre roadtrip !",
       },
     ]);
-    
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-    
-    // Fermer la sidebar sur mobile après avoir démarré une nouvelle session
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
-    
-    toast.success("Nouvelle conversation démarrée");
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    setTimeout(() => inputRef.current?.focus(), 100);
+    if (isMobile) setSidebarOpen(false);
 
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user" as const,
-      content: input,
-    };
+    toast.success("🎉 Nouvelle conversation démarrée");
+  }, [isMobile]);
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
+  // Gère l'envoi d'un nouveau message
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent): Promise<void> => {
+      e.preventDefault();
+      if (!input.trim() || isLoading) return;
 
-    try {
-      await AssistantService.saveMessage("user", input, conversationId);
-
-      const result = await AssistantService.askAssistant(input, {
-        location: "Italie",
-        duration: 7,
-        budget: 1200,
-        travelStyle: "détente",
-        includeWeather: true,
-        includeAttractions: true,
-        conversationId,
-      });
-
-      const formatted = formatAiResponse(result);
-
-      const assistantMessage = {
+      // Créer le message utilisateur
+      const userMessage: Message = {
         id: Date.now().toString(),
-        role: "assistant" as const,
-        content: formatted,
+        role: "user",
+        content: input,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
-      await AssistantService.saveMessage("assistant", formatted, conversationId);
-    } catch (error) {
-      console.error("Erreur lors de l'appel à l'IA:", error);
-      
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
+      // Ajouter le message à l'état et vider le champ de saisie
+      setMessages((prev) => [...prev, userMessage]);
+      const currentInput = input;
+      setInput("");
+      setIsLoading(true);
+
+      // Dans handleSubmit, remplacez la section IA par :
+
+      try {
+        // Sauvegarder le message utilisateur
+        await AiService.saveMessage(
+          "user",
+          currentInput,
+          conversationId
+        );
+
+        console.log("🚀 ENVOI REQUÊTE IA:", currentInput);
+
+        // Appeler l'assistant IA
+        const result = await AiService.askAssistant(currentInput, {
+          includeWeather: true,
+          conversationId,
+        });
+
+        console.log("📥 RÉPONSE BRUTE REÇUE:", result);
+        console.log("📊 TYPE DE RÉPONSE:", typeof result);
+        console.log("🏷️ TYPE DANS OBJET:", result?.type);
+
+        // Vérifier si c'est déjà une string ou un objet
+        let formatted: string;
+
+        if (typeof result === "string") {
+          console.log("⚠️ RÉPONSE DÉJÀ EN STRING — tentative de parsing JSON");
+          try {
+            const parsed = JSON.parse(result);
+            formatted = formatAiResponse(parsed);
+          } catch {
+            console.warn("Impossible de parser la chaîne JSON, on garde brut");
+            formatted = result; // fallback si ce n’est pas du JSON
+          }
+        } else if (result && typeof result === "object") {
+          console.log("✅ FORMATAGE DE L'OBJET");
+          formatted = formatAiResponse(result);
+          console.log(
+            "🎨 RÉSULTAT FORMATÉ:",
+            formatted.substring(0, 200) + "..."
+          );
+        } else {
+          console.log("❌ RÉPONSE INVALIDE");
+          formatted = "❌ Réponse invalide reçue de l'assistant.";
+        }
+
+        // Créer le message de réponse de l'assistant
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "Une erreur est survenue lors de l'appel à l'IA. Veuillez réessayer.",
-        },
-      ]);
-      
-      toast.error("Erreur lors de l'appel à l'IA");
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-    }
-  };
+          content: formatted,
+        };
 
-  const handleDownloadPDF = async () => {
-    const input = document.getElementById("pdf-content");
-    if (!input) return;
+        console.log(
+          "💬 MESSAGE FINAL:",
+          assistantMessage.content.substring(0, 200) + "..."
+        );
 
-    // Afficher un message de chargement
-    if (isMobile) {
-      toast.info("Génération du PDF en cours...");
+        // Ajouter la réponse de l'assistant
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Sauvegarder la réponse de l'assistant
+        await AiService.saveMessage(
+          "assistant",
+          formatted,
+          conversationId
+        );
+
+        toast.success("Message envoyé avec succès");
+      } catch (error) {
+        console.error("❌ ERREUR COMPLÈTE:", error);
+
+        // Ajouter un message d'erreur détaillé
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `❌ **Erreur technique**\n\nDétails : ${
+            error instanceof Error ? error.message : "Erreur inconnue"
+          }\n\nVeuillez réessayer dans quelques instants.`,
+        };
+
+        setMessages((prev) => [...prev, errorMessage]);
+        toast.error("Erreur lors de l'appel à l'IA");
+      } finally {
+        setIsLoading(false);
+        setTimeout(scrollToBottom, 100);
+      }
+    },
+    [input, isLoading, conversationId, scrollToBottom]
+  );
+
+  // Gère le téléchargement de la conversation en PDF
+  const handleDownloadPDF = useCallback(async (): Promise<void> => {
+    const element = document.getElementById("pdf-content");
+    if (!element) {
+      toast.error("Impossible de trouver le contenu à exporter");
+      return;
     }
+
+    toast.info("Génération du PDF en cours...");
 
     try {
-      const canvas = await html2canvas(input, {
+      const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         scrollY: -window.scrollY,
+        backgroundColor: "#fafaf9",
       });
-  
+
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-  
+
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`conversation-${conversationId}.pdf`);
-      
-      // Fermer la sidebar sur mobile après téléchargement
-      if (isMobile) {
-        setSidebarOpen(false);
-        toast.success("PDF téléchargé avec succès");
-      }
+      pdf.save(
+        `roadtrip-conversation-${new Date().toISOString().split("T")[0]}.pdf`
+      );
+
+      if (isMobile) setSidebarOpen(false);
+      toast.success("PDF téléchargé avec succès");
     } catch (error) {
       console.error("Erreur lors de la création du PDF:", error);
       toast.error("Impossible de générer le PDF");
     }
-  };
+  }, [isMobile]);
 
-  const toggleSidebar = () => {
+  // Gère l'ouverture/fermeture de la sidebar
+  const toggleSidebar = useCallback((): void => {
     setSidebarOpen(!sidebarOpen);
-  };
+  }, [sidebarOpen]);
 
-  // Affichage d'un indicateur de chargement pendant la vérification d'authentification
+  // Gère le changement de valeur du champ de saisie
+  const handleInputChange = useCallback((value: string): void => {
+    setInput(value);
+  }, []);
+
+  // Vérification d'authentification au chargement
+  useEffect(() => {
+    checkAuthentication();
+  }, [checkAuthentication]);
+
+  // Gestion responsive de la sidebar
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+  }, [isMobile]);
+
+  // Affichage du loader pendant la vérification d'authentification
   if (isCheckingAuth) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-stone-50">
-        <div className="text-stone-500 flex flex-col items-center">
-          <div className="mb-4">Chargement de l'assistant...</div>
-          <div className="flex space-x-2">
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <Loading text="Chargement de l'assistant..." />;
   }
 
   return (
     <div className="flex h-screen bg-stone-50 overflow-hidden">
-      {/* Sidebar - avec animation de transition */}
-      {(sidebarOpen || !isMobile) && (
-        <aside 
-          className={`
-            ${sidebarOpen ? "w-72" : "w-0 md:w-20"} 
-            ${sidebarOpen ? "translate-x-0" : isMobile ? "-translate-x-full" : "translate-x-0"}
-            transition-all duration-300 ease-in-out 
-            flex-shrink-0 border-r border-stone-200 bg-white 
-            flex flex-col h-full
-            ${isMobile ? "fixed z-30" : "relative"}
-          `}
-        >
-          <div className="p-4 md:p-6 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-6 md:mb-8">
-              <h2 className={`text-xl font-light text-stone-800 flex items-center gap-2 ${!sidebarOpen && "md:hidden"}`}>
-                Assistant ROADTRIP!
-              </h2>
-              
-              {/* Logo minimaliste quand la sidebar est réduite (visible seulement sur desktop) */}
-              <div className={`${sidebarOpen ? "hidden" : "hidden md:flex"} items-center justify-center w-full`}>
-                <span className="text-2xl">✈️</span>
-              </div>
-              
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={toggleSidebar}
-                className="p-0 h-8 w-8 rounded-full md:hidden"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+      {/* Sidebar avec navigation et actions */}
+      <AssistantSidebar
+        isOpen={sidebarOpen}
+        onToggle={toggleSidebar}
+        isMobile={isMobile}
+        onNewConversation={startNewSession}
+        onDownloadPDF={handleDownloadPDF}
+        downloadDisabled={messages.length <= 1}
+      />
 
-            <div className={`flex flex-col gap-4 ${!sidebarOpen && "md:items-center"}`}>
-              <Button
-                onClick={startNewSession}
-                variant="outline"
-                className={`${
-                  !sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-5 md:py-6 rounded-xl"
-                } border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all flex items-center gap-2 text-stone-700`}
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span className={`${!sidebarOpen && "md:hidden"} text-sm md:text-base`}>Nouvelle conversation</span>
-              </Button>
-
-              <Link href="/ai/history" className="block">
-                <Button
-                  variant="ghost"
-                  className={`${
-                    !sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-4 md:py-5 rounded-xl"
-                  } text-stone-600 hover:bg-stone-100 hover:text-stone-800 transition-all flex items-center gap-2`}
-                >
-                  <History className="h-4 w-4" />
-                  <span className={`${!sidebarOpen && "md:hidden"} text-sm md:text-base`}>Historique</span>
-                </Button>
-              </Link>
-
-              <Button
-                onClick={handleDownloadPDF}
-                variant="ghost"
-                className={`${
-                  !sidebarOpen ? "md:p-3 md:w-12 md:h-12 md:rounded-full md:justify-center" : "w-full py-4 md:py-5 rounded-xl"
-                } text-stone-600 hover:bg-stone-100 hover:text-stone-800 transition-all flex items-center gap-2`}
-                disabled={messages.length <= 1}
-              >
-                <Download className="h-4 w-4" />
-                <span className={`${!sidebarOpen && "md:hidden"} text-sm md:text-base`}>Télécharger PDF</span>
-              </Button>
-            </div>
-
-            <div className={`mt-auto pt-6 border-t border-stone-100 ${!sidebarOpen && "md:hidden"}`}>
-              <p className="text-xs text-stone-500 italic">
-                Votre compagnon de voyage intelligent
-              </p>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* Overlay pour fermer le menu sur mobile */}
-      {sidebarOpen && isMobile && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
-          onClick={() => setSidebarOpen(false)}
+      {/* Zone de chat principale */}
+      <div className="flex-1 flex flex-col w-full">
+        {/* Header du chat */}
+        <ChatHeader
+          title="Assistant ROADTRIP!"
+          showMenuButton={!sidebarOpen || isMobile}
+          onMenuClick={toggleSidebar}
+          showHistoryButton={true}
+          isMobile={isMobile}
+          isLoading={isLoading}
         />
-      )}
 
-      {/* Chat area */}
-      <div 
-        className={`flex-1 flex flex-col w-full transition-all duration-300 ease-in-out`}
-      >
-        {/* Header avec bouton menu pour mobile ou desktop fermé */}
-        <div className={`bg-white border-b border-stone-200 p-4 shadow-sm flex items-center justify-between`}>
-          <div className="flex items-center">
-            {(!sidebarOpen || isMobile) && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="p-1 mr-3"
-              >
-                <Menu className="h-6 w-6 text-stone-700" />
-              </Button>
-            )}
-            <h2 className="text-lg font-light text-stone-800">
-              Assistant RoadTrip
-            </h2>
-          </div>
-          
-          {isMobile && (
-            <Link href="/ai/history">
-              <Button variant="ghost" size="icon" className="p-1">
-                <History className="h-5 w-5 text-stone-700" />
-              </Button>
-            </Link>
-          )}
-        </div>
+        {/* Bouton de fermeture de la sidebar (desktop) */}
+        <SidebarToggle
+          isOpen={sidebarOpen}
+          onClick={toggleSidebar}
+          isMobile={isMobile}
+        />
 
-        {/* Toggle button pour desktop - uniquement visible quand la sidebar est ouverte et sur desktop */}
-        {sidebarOpen && !isMobile && (
-          <div className="absolute left-72 top-6 z-20 transform -translate-x-1/2 transition-all duration-300 ease-in-out">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="bg-white h-8 w-8 rounded-full border border-stone-200 shadow-sm"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        <div 
+        {/* Zone des messages */}
+        <div
           ref={chatContainerRef}
-          id="pdf-content" 
-          className="flex-1 overflow-y-auto p-3 md:p-8 space-y-4 md:space-y-6 bg-stone-50"
+          id="pdf-content"
+          className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-gradient-to-b from-stone-50 to-stone-100"
         >
+          {/* Affichage des messages */}
           {messages.map((message) => (
-            <div
+            <MessageBubble
               key={message.id}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-xs sm:max-w-md md:max-w-2xl p-3 md:p-5 rounded-2xl text-sm md:text-base whitespace-pre-wrap leading-relaxed ${
-                  message.role === "assistant"
-                    ? "bg-white text-stone-800 shadow-sm border border-stone-100"
-                    : "bg-red-600 text-white shadow-md"
-                }`}
-              >
-                {message.content}
-              </div>
-            </div>
+              message={message}
+              showTimestamp={false}
+            />
           ))}
 
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white text-stone-500 p-4 rounded-2xl shadow-sm border border-stone-100 flex items-center gap-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                  <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                  <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                </div>
-                <span className="text-xs text-stone-400 ml-2">L'assistant réfléchit...</span>
-              </div>
-            </div>
-          )}
+          {/* Indicateur de frappe pendant le chargement */}
+          {isLoading && <TypingIndicator />}
 
+          {/* Élément pour le scroll automatique */}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <form
+        {/* Zone de saisie */}
+        <ChatInput
+          ref={inputRef}
+          value={input}
+          onChange={handleInputChange}
           onSubmit={handleSubmit}
-          className="border-t border-stone-200 px-3 md:px-8 py-3 md:py-5 bg-white flex items-center gap-2 md:gap-3 shadow-sm"
-        >
-          <Input
-            ref={inputRef}
-            className="flex-1 text-sm md:text-base py-4 md:py-6 px-3 md:px-4 rounded-xl border border-stone-200 focus:ring-1 focus:ring-red-600 focus:border-red-600 transition-all shadow-sm bg-stone-50"
-            placeholder={isMobile ? "Votre question..." : "Posez votre question sur votre voyage..."}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={isLoading}
-          />
-
-          <Button
-            type="submit"
-            className="bg-red-600 text-white hover:bg-red-700 p-4 md:p-6 rounded-xl transition-all shadow"
-            disabled={isLoading || !input.trim()}
-          >
-            <Send className="h-4 md:h-5 w-4 md:w-5" />
-          </Button>
-        </form>
+          disabled={isLoading}
+          isMobile={isMobile}
+        />
       </div>
     </div>
   );

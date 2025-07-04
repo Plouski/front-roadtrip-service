@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function OAuthCallback() {
   const router = useRouter();
@@ -32,11 +33,9 @@ export default function OAuthCallback() {
 
   // Petit retour visuel pendant la redirection
   return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-500 mx-auto mb-4"></div>
-        <p className="text-gray-700">Connexion en cours...</p>
-      </div>
+    <div className="flex flex-col items-center justify-center py-10 text-gray-500 animate-fade-in">
+      <Loader2 className="h-10 w-10 animate-spin text-red-600 mb-5" />
+      <p className="text-sm sm:text-base md:text-lg">Connexion en cours...</p>
     </div>
   );
 }

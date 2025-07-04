@@ -1,28 +1,86 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { AuthService } from "@/services/auth-service"
-import { AlertMessage } from "@/components/ui/alert-message"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Slider } from "@/components/ui/slider"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Plus, Minus, X, ImagePlus, ChevronRight, ChevronLeft, Save } from "lucide-react"
-import { countries } from "@/lib/countries"
-import { availableTags } from "@/lib/tags"
-import { seasons } from "@/lib/seasons"
-import { uploadImageToCloudinary } from "@/lib/cloudinary"
-import { AdminService } from "@/services/admin-service"
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { AlertMessage } from "@/components/ui/alert-message";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Loader2,
+  Plus,
+  Minus,
+  X,
+  ImagePlus,
+  ChevronRight,
+  ChevronLeft,
+  Save,
+} from "lucide-react";
+import { countries } from "@/lib/countries";
+import { availableTags } from "@/lib/tags";
+import { seasons } from "@/lib/seasons";
+import { uploadImageToCloudinary } from "@/lib/cloudinary";
+import { AdminService } from "@/services/admin-service";
+import Loading from "@/components/ui/loading";
 
-// État initial du roadtrip
-const initialRoadtripState = {
+interface PointOfInterest {
+  name: string;
+  description: string;
+  image: string;
+}
+
+interface ItineraryStep {
+  day: number;
+  title: string;
+  description: string;
+  overnight: boolean;
+}
+
+interface Roadtrip {
+  title: string;
+  image: string;
+  country: string;
+  region: string;
+  duration: number;
+  budget: number;
+  tags: string[];
+  description: string;
+  isPremium: boolean;
+  bestSeason: string;
+  pointsOfInterest: PointOfInterest[];
+  itinerary: ItineraryStep[];
+  isPublished: boolean;
+}
+
+const TABS_ORDER = [
+  "basic-info",
+  "details",
+  "points-of-interest",
+  "itinerary",
+  "publishing",
+] as const;
+
+const INITIAL_ROADTRIP_STATE: Roadtrip = {
   title: "",
   image: "/placeholder.svg?height=600&width=800",
   country: "",
@@ -35,309 +93,425 @@ const initialRoadtripState = {
   bestSeason: "",
   pointsOfInterest: [],
   itinerary: [],
-  isPublished: false
-}
+  isPublished: false,
+};
+
+const INITIAL_POI_STATE: PointOfInterest = {
+  name: "",
+  description: "",
+  image: "/placeholder.svg?height=300&width=400",
+};
 
 export default function CreateRoadTrip() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState("basic-info")
-  const [alertMessage, setAlertMessage] = useState("")
-  const [alertType, setAlertType] = useState(null)
-  
-  // État principal du roadtrip
-  const [roadtrip, setRoadtrip] = useState(initialRoadtripState)
-  
-  // État pour les entrées d'itinéraire (un pour chaque jour)
-  const [itineraryInputs, setItineraryInputs] = useState([])
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] =
+    useState<(typeof TABS_ORDER)[number]>("basic-info");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | null>(null);
+  const [roadtrip, setRoadtrip] = useState<Roadtrip>(INITIAL_ROADTRIP_STATE);
+  const [itineraryInputs, setItineraryInputs] = useState<ItineraryStep[]>([]);
+  const [selectedTag, setSelectedTag] = useState("");
+  const [tempPointOfInterest, setTempPointOfInterest] =
+    useState<PointOfInterest>(INITIAL_POI_STATE);
 
-  // États temporaires pour l'ajout de nouveaux éléments
-  const [selectedTag, setSelectedTag] = useState("")
-  const [tempPointOfInterest, setTempPointOfInterest] = useState({
-    name: "",
-    description: "",
-    image: "/placeholder.svg?height=300&width=400"
-  })
+  // Affiche un message d'alerte
+  const showAlert = useCallback(
+    (message: string, type: "success" | "error") => {
+      setAlertMessage("");
+      setAlertType(null);
 
-  // Vérifier si c'est un administrateur ou pas
+      setTimeout(() => {
+        setAlertMessage(message);
+        setAlertType(type);
+      }, 10);
+    },
+    []
+  );
+
+  // Met à jour un champ du roadtrip
+  const updateRoadtripField = useCallback(
+    <K extends keyof Roadtrip>(field: K, value: Roadtrip[K]) => {
+      setRoadtrip((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  // Met à jour les données d'une étape d'itinéraire
+  const updateItineraryStep = useCallback(
+    (index: number, field: keyof ItineraryStep, value: any) => {
+      setItineraryInputs((prev) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], [field]: value };
+        return updated;
+      });
+    },
+    []
+  );
+
+  // Vérification des droits d'administration au chargement
   useEffect(() => {
-    const isAdmin = async () => {
+    const checkAdminStatus = async () => {
       try {
-        const authenticated = await AuthService.isAdmin()
-        setIsAdmin(authenticated)
+        const authenticated = await AdminService.isAdmin();
+        setIsAdmin(authenticated);
 
         if (!authenticated) {
-          router.push('/')
-          return
+          router.push("/");
+          return;
         }
       } catch (error) {
-        console.error("Error checking authentication:", error)
+        console.error("Erreur lors de la vérification des droits :", error);
+        showAlert("Erreur lors de la vérification des droits", "error");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    isAdmin()
-  }, [router])
+    checkAdminStatus();
+  }, [router, showAlert]);
 
-  // Mise à jour des étapes d'itinéraire lorsque la durée change
+  // Génération automatique des étapes d'itinéraire selon la durée
   useEffect(() => {
-    // Créer un tableau d'étapes basé sur la durée avec valeurs par défaut
-    const steps = Array.from({ length: roadtrip.duration }, (_, i) => ({
-      day: i + 1,
-      title: "",
-      description: "",
-      overnight: true
-    }))
-    
-    // Conserver les données déjà saisies si elles existent
-    const updatedSteps = steps.map(step => {
-      const existingStep = itineraryInputs.find(item => item.day === step.day)
-      return existingStep ? existingStep : step
-    })
-    
-    setItineraryInputs(updatedSteps)
-  }, [roadtrip.duration])
+    // Créer les étapes basées sur la durée
+    const generateSteps = (duration: number): ItineraryStep[] => {
+      return Array.from({ length: duration }, (_, i) => ({
+        day: i + 1,
+        title: "",
+        description: "",
+        overnight: true,
+      }));
+    };
 
-  // Fonctions de gestion des modifications
-  const handleChange = (field, value) => {
-    setRoadtrip(prev => ({
+    const newSteps = generateSteps(roadtrip.duration);
+
+    // Conserver les données existantes si elles sont disponibles
+    const updatedSteps = newSteps.map((step) => {
+      const existingStep = itineraryInputs.find(
+        (item) => item.day === step.day
+      );
+      return existingStep || step;
+    });
+
+    setItineraryInputs(updatedSteps);
+  }, [roadtrip.duration]);
+
+  // Gestion de la sélection/désélection des tags
+  const handleTagToggle = useCallback((tag: string) => {
+    setRoadtrip((prev) => ({
       ...prev,
-      [field]: value
-    }))
-  }
+      tags: prev.tags.includes(tag)
+        ? prev.tags.filter((t) => t !== tag)
+        : [...prev.tags, tag],
+    }));
+  }, []);
 
-  const updateItineraryInput = (index, field, value) => {
-    setItineraryInputs(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
-      return updated
-    })
-  }
-
-  const handleTagSelect = (tag) => {
-    setRoadtrip(prev => ({
-      ...prev,
-      tags: prev.tags.includes(tag) 
-        ? prev.tags.filter(t => t !== tag)
-        : [...prev.tags, tag]
-    }))
-  }
-
-  // Gestion des points d'intérêt
-  const addPointOfInterest = () => {
-    if (!tempPointOfInterest.name || !tempPointOfInterest.description) {
-      showAlert("Veuillez remplir tous les champs du point d'intérêt", "error")
-      return
+  // Ajout d'un nouveau point d'intérêt
+  const addPointOfInterest = useCallback(() => {
+    if (
+      !tempPointOfInterest.name.trim() ||
+      !tempPointOfInterest.description.trim()
+    ) {
+      showAlert("Veuillez remplir tous les champs du point d'intérêt", "error");
+      return;
     }
 
-    setRoadtrip(prev => ({
+    setRoadtrip((prev) => ({
       ...prev,
-      pointsOfInterest: [...prev.pointsOfInterest, { ...tempPointOfInterest }]
-    }))
+      pointsOfInterest: [...prev.pointsOfInterest, { ...tempPointOfInterest }],
+    }));
 
-    // Réinitialiser le formulaire temporaire
-    setTempPointOfInterest({
-      name: "",
-      description: "",
-      image: "/placeholder.svg?height=300&width=400"
-    })
-  }
+    setTempPointOfInterest(INITIAL_POI_STATE);
+  }, [tempPointOfInterest, showAlert]);
 
-  const removePointOfInterest = (index) => {
-    setRoadtrip(prev => ({
+  // Suppression d'un point d'intérêt
+  const removePointOfInterest = useCallback((index: number) => {
+    setRoadtrip((prev) => ({
       ...prev,
-      pointsOfInterest: prev.pointsOfInterest.filter((_, i) => i !== index)
-    }))
-  }
+      pointsOfInterest: prev.pointsOfInterest.filter((_, i) => i !== index),
+    }));
+  }, []);
 
-  // Gestion des images
-  const handleImageUpload = async (type, index = null) => {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "image/*"
+  // Gestion de l'upload d'images
+  const handleImageUpload = useCallback(
+    async (type: "main" | "poi", index?: number) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
 
-    input.onchange = async (event) => {
-      const file = event.target.files?.[0]
-      if (!file) return
+      input.onchange = async (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
 
-      try {
-        const imageUrl = await uploadImageToCloudinary(file)
+        try {
+          const imageUrl = await uploadImageToCloudinary(file);
 
-        if (type === "main") {
-          handleChange("image", imageUrl)
-        } else if (type === "poi" && index === null) {
-          setTempPointOfInterest((prev) => ({ ...prev, image: imageUrl }))
-        } else if (type === "poi" && index !== null) {
-          const updatedPOIs = [...roadtrip.pointsOfInterest]
-          updatedPOIs[index].image = imageUrl
-          handleChange("pointsOfInterest", updatedPOIs)
+          if (type === "main") {
+            updateRoadtripField("image", imageUrl);
+          } else if (type === "poi") {
+            if (index === undefined) {
+              setTempPointOfInterest((prev) => ({ ...prev, image: imageUrl }));
+            } else {
+              setRoadtrip((prev) => {
+                const updatedPOIs = [...prev.pointsOfInterest];
+                updatedPOIs[index].image = imageUrl;
+                return { ...prev, pointsOfInterest: updatedPOIs };
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Erreur lors de l'upload :", error);
+          showAlert("Erreur lors de l'upload de l'image", "error");
         }
-      } catch (error) {
-        console.error("Erreur upload Cloudinary :", error)
-        showAlert("Erreur lors de l'upload de l'image", "error")
-      }
-    }
+      };
 
-    input.click()
-  }
+      input.click();
+    },
+    [updateRoadtripField, showAlert]
+  );
 
-  // Navigation et validation des onglets
-  const validateCurrentTab = () => {
-    if (activeTab === "basic-info") {
-      if (!roadtrip.title || !roadtrip.country || !roadtrip.description) {
-        showAlert("Veuillez remplir tous les champs obligatoires (titre, pays, description)", "error")
-        return false
-      }
-    } else if (activeTab === "details") {
-      if (!roadtrip.bestSeason || roadtrip.tags.length === 0) {
-        showAlert("Veuillez sélectionner au moins une saison et un tag", "error")
-        return false
-      }
-    } else if (activeTab === "points-of-interest") {
-      if (roadtrip.pointsOfInterest.length === 0) {
-        showAlert("Veuillez ajouter au moins un point d'intérêt", "error")
-        return false
-      }
-    } else if (activeTab === "itinerary") {
-      // Vérifier que tous les jours ont un titre et une description
-      const incompleteDay = itineraryInputs.find(day => !day.title || !day.description)
-      if (incompleteDay) {
-        showAlert(`Veuillez compléter les informations pour le jour ${incompleteDay.day}`, "error")
-        return false
-      }
-    }
-
-    return true
-  }
-
-  const navigateTabs = (direction) => {
-    const tabs = ["basic-info", "details", "points-of-interest", "itinerary", "publishing"]
-    const currentIndex = tabs.indexOf(activeTab)
-    const nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1
-
-    if (nextIndex >= 0 && nextIndex < tabs.length) {
-      setActiveTab(tabs[nextIndex])
-    }
-  }
-
-  const handleNextTab = () => {
-    if (validateCurrentTab()) {
-      navigateTabs('next')
-      clearAlert()
-    }
-  }
-
-  const isTabUnlocked = (tab) => {
-    switch (tab) {
+  // Validation des données de l'onglet actuel
+  const validateCurrentTab = useCallback((): boolean => {
+    switch (activeTab) {
       case "basic-info":
-        return true
+        if (
+          !roadtrip.title.trim() ||
+          !roadtrip.country ||
+          !roadtrip.description.trim()
+        ) {
+          showAlert(
+            "Veuillez remplir tous les champs obligatoires (titre, pays, description)",
+            "error"
+          );
+          return false;
+        }
+        break;
+
       case "details":
-        return roadtrip.title && roadtrip.country && roadtrip.description
+        if (!roadtrip.bestSeason || roadtrip.tags.length === 0) {
+          showAlert(
+            "Veuillez sélectionner au moins une saison et un tag",
+            "error"
+          );
+          return false;
+        }
+        break;
+
       case "points-of-interest":
-        return roadtrip.bestSeason && roadtrip.tags.length > 0
+        if (roadtrip.pointsOfInterest.length === 0) {
+          showAlert("Veuillez ajouter au moins un point d'intérêt", "error");
+          return false;
+        }
+        break;
+
       case "itinerary":
-        return roadtrip.pointsOfInterest.length > 0
-      case "publishing":
-        // Vérifie que tous les jours d'itinéraire ont été complétés
-        return itineraryInputs.length > 0 && 
-               itineraryInputs.every(day => day.title && day.description)
-      default:
-        return false
+        const incompleteStep = itineraryInputs.find(
+          (step) => !step.title.trim() || !step.description.trim()
+        );
+        if (incompleteStep) {
+          showAlert(
+            `Veuillez compléter les informations pour le jour ${incompleteStep.day}`,
+            "error"
+          );
+          return false;
+        }
+        break;
     }
-  }
 
-  // Gestion des alertes
-  const showAlert = (message, type) => {
-    setAlertMessage(message)
-    setAlertType(type)
-  }
+    return true;
+  }, [activeTab, roadtrip, itineraryInputs, showAlert]);
 
-  const clearAlert = () => {
-    setAlertMessage("")
-    setAlertType(null)
-  }
+  // Navigation entre les onglets
+  const navigateToTab = useCallback(
+    (direction: "next" | "prev") => {
+      const currentIndex = TABS_ORDER.indexOf(activeTab);
+      const nextIndex =
+        direction === "next" ? currentIndex + 1 : currentIndex - 1;
+
+      if (nextIndex >= 0 && nextIndex < TABS_ORDER.length) {
+        setActiveTab(TABS_ORDER[nextIndex]);
+      }
+    },
+    [activeTab]
+  );
+
+  // Passage à l'onglet suivant avec validation
+  const handleNextTab = useCallback(() => {
+    if (validateCurrentTab()) {
+      navigateToTab("next");
+    }
+  }, [validateCurrentTab, navigateToTab]);
+
+  // Vérification si un onglet est déverrouillé
+  const isTabUnlocked = useCallback(
+    (tab: string): boolean => {
+      switch (tab) {
+        case "basic-info":
+          return true;
+        case "details":
+          return !!(
+            roadtrip.title.trim() &&
+            roadtrip.country &&
+            roadtrip.description.trim()
+          );
+        case "points-of-interest":
+          return !!(roadtrip.bestSeason && roadtrip.tags.length > 0);
+        case "itinerary":
+          return roadtrip.pointsOfInterest.length > 0;
+        case "publishing":
+          return (
+            itineraryInputs.length > 0 &&
+            itineraryInputs.every(
+              (step) => step.title.trim() && step.description.trim()
+            )
+          );
+        default:
+          return false;
+      }
+    },
+    [roadtrip, itineraryInputs]
+  );
+
+  // Validation finale avant sauvegarde
+  const validateForSave = useCallback((): boolean => {
+    const requiredFields = [
+      roadtrip.title.trim(),
+      roadtrip.country,
+      roadtrip.description.trim(),
+      roadtrip.bestSeason,
+    ];
+
+    const validationChecks = [
+      ...requiredFields,
+      roadtrip.tags.length > 0,
+      roadtrip.pointsOfInterest.length > 0,
+      itineraryInputs.every(
+        (step) => step.title.trim() && step.description.trim()
+      ),
+    ];
+
+    return validationChecks.every(Boolean);
+  }, [roadtrip, itineraryInputs]);
 
   // Sauvegarde du roadtrip
-  const handleSaveRoadtrip = async (publish = false) => {
-    try {
-      // Validation finale de tous les champs requis
-      if (
-        !roadtrip.title ||
-        !roadtrip.country ||
-        !roadtrip.description ||
-        !roadtrip.bestSeason ||
-        roadtrip.tags.length === 0 ||
-        roadtrip.pointsOfInterest.length === 0 ||
-        itineraryInputs.some(step => !step.title || !step.description)
-      ) {
-        showAlert("Veuillez remplir tous les champs obligatoires dans chaque section", "error")
-        return
+  const handleSaveRoadtrip = useCallback(
+    async (publish = false) => {
+      if (!validateForSave()) {
+        showAlert(
+          "Veuillez remplir tous les champs obligatoires dans chaque section",
+          "error"
+        );
+        return;
       }
 
-      setIsSaving(true)
+      setIsSaving(true);
 
-      const roadtripToSave = {
-        ...roadtrip,
-        itinerary: itineraryInputs,
-        isPublished: publish
+      try {
+        const roadtripToSave: Roadtrip = {
+          ...roadtrip,
+          itinerary: itineraryInputs,
+          isPublished: publish,
+        };
+
+        const savedRoadtrip = await AdminService.createRoadtrip(roadtripToSave);
+
+        showAlert(
+          `Roadtrip ${publish ? "publié" : "sauvegardé"} avec succès !`,
+          "success"
+        );
+
+        // Redirection différée
+        setTimeout(() => {
+          router.push(`/roadtrip/${savedRoadtrip.id}`);
+        }, 1500);
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde :", error);
+        showAlert("Erreur lors de la sauvegarde du roadtrip", "error");
+      } finally {
+        setIsSaving(false);
       }
+    },
+    [roadtrip, itineraryInputs, validateForSave, showAlert, router]
+  );
 
-      // Appel au service pour sauvegarder le roadtrip
-      const savedRoadtrip = await AdminService.createRoadtrip(roadtripToSave)
+  // Statistiques de progression
+  const completionStats = useMemo(() => {
+    const completedSteps = itineraryInputs.filter(
+      (step) => step.title.trim() && step.description.trim()
+    ).length;
 
-      showAlert(`Roadtrip ${publish ? 'publié' : 'sauvegardé'} avec succès !`, "success")
+    return {
+      completed: completedSteps,
+      total: roadtrip.duration,
+      percentage:
+        roadtrip.duration > 0
+          ? Math.round((completedSteps / roadtrip.duration) * 100)
+          : 0,
+    };
+  }, [itineraryInputs, roadtrip.duration]);
 
-      // Redirection vers la page de visualisation après un court délai
-      setTimeout(() => {
-        router.push(`/roadtrip/${savedRoadtrip.id}`)
-      }, 1500)
-    } catch (error) {
-      console.error("Error saving roadtrip:", error)
-      showAlert("Erreur lors de la sauvegarde du roadtrip", "error")
-    } finally {
-      setIsSaving(false)
-    }
-  }
+  // Tags disponibles (non sélectionnés)
+  const availableTagsFiltered = useMemo(
+    () => availableTags.filter((tag) => !roadtrip.tags.includes(tag)),
+    [roadtrip.tags]
+  );
 
-  // Afficher l'état de chargement
+  // Écran de chargement
   if (isLoading) {
-    return (
-      <div className="container flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
-          <h2 className="text-xl font-semibold">Chargement...</h2>
-        </div>
-      </div>
-    )
+    <Loading text="Vérification des droits..." />;
   }
 
   return (
     <div className="container py-10">
       <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+        {/* En-tête */}
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Créer un nouveau Roadtrip</h1>
-          <Button variant="outline" onClick={() => router.push('/dashboard')}>
+          <Button variant="outline" onClick={() => router.push("/admin")}>
             Annuler
           </Button>
         </div>
 
+        {/* Message d'alerte */}
         {alertMessage && (
           <AlertMessage message={alertMessage} type={alertType} />
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        {/* Interface à onglets */}
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
+          {/* Navigation des onglets */}
           <TabsList className="grid grid-cols-5">
             <TabsTrigger value="basic-info">Infos de base</TabsTrigger>
-            <TabsTrigger value="details" disabled={!isTabUnlocked("details")}>Détails</TabsTrigger>
-            <TabsTrigger value="points-of-interest" disabled={!isTabUnlocked("points-of-interest")}>Points d'intérêt</TabsTrigger>
-            <TabsTrigger value="itinerary" disabled={!isTabUnlocked("itinerary")}>Itinéraire</TabsTrigger>
-            <TabsTrigger value="publishing" disabled={!isTabUnlocked("publishing")}>Publication</TabsTrigger>
+            <TabsTrigger value="details" disabled={!isTabUnlocked("details")}>
+              Détails
+            </TabsTrigger>
+            <TabsTrigger
+              value="points-of-interest"
+              disabled={!isTabUnlocked("points-of-interest")}
+            >
+              Points d'intérêt
+            </TabsTrigger>
+            <TabsTrigger
+              value="itinerary"
+              disabled={!isTabUnlocked("itinerary")}
+            >
+              Itinéraire
+            </TabsTrigger>
+            <TabsTrigger
+              value="publishing"
+              disabled={!isTabUnlocked("publishing")}
+            >
+              Publication
+            </TabsTrigger>
           </TabsList>
 
-          {/* Onglet Informations de base */}
+          {/* ONGLET INFORMATIONS DE BASE */}
           <TabsContent value="basic-info" className="space-y-6">
             <Card>
               <CardHeader>
@@ -347,7 +521,8 @@ export default function CreateRoadTrip() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-              <div className="space-y-1">
+                {/* Image principale */}
+                <div className="space-y-1">
                   <Label>Image principale</Label>
                   <div className="border rounded-md p-4">
                     <div className="aspect-video bg-muted rounded-md overflow-hidden">
@@ -367,48 +542,67 @@ export default function CreateRoadTrip() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Titre */}
                 <div className="space-y-1">
-                  <Label htmlFor="title">Titre du roadtrip <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="title">
+                    Titre du roadtrip <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="title"
-                    placeholder="Ex: La Côte d'Azur en cabriolet"
+                    placeholder="Le titre du roadtrip (ex: Roadtrip dans les Alpes françaises)"
                     value={roadtrip.title}
-                    onChange={(e) => handleChange('title', e.target.value)}
+                    onChange={(e) =>
+                      updateRoadtripField("title", e.target.value)
+                    }
                     required
                   />
                 </div>
 
+                {/* Pays */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <Label htmlFor="country">Pays <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="country">
+                      Pays <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={roadtrip.country}
-                      onValueChange={(value) => handleChange('country', value)}
+                      onValueChange={(value) =>
+                        updateRoadtripField("country", value)
+                      }
                     >
                       <SelectTrigger id="country">
                         <SelectValue placeholder="Sélectionner un pays" />
                       </SelectTrigger>
                       <SelectContent>
                         {countries.map((country) => (
-                          <SelectItem key={country} value={country}>{country}</SelectItem>
+                          <SelectItem key={country} value={country}>
+                            {country}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
+                {/* Description */}
                 <div className="space-y-1">
-                  <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="description">
+                    Description <span className="text-red-500">*</span>
+                  </Label>
                   <Textarea
                     id="description"
                     placeholder="Décrivez votre roadtrip de manière attrayante..."
                     value={roadtrip.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
+                    onChange={(e) =>
+                      updateRoadtripField("description", e.target.value)
+                    }
                     rows={5}
                     required
                   />
                 </div>
               </CardContent>
+
               <CardFooter className="flex justify-end">
                 <Button onClick={handleNextTab}>
                   Suivant
@@ -418,7 +612,7 @@ export default function CreateRoadTrip() {
             </Card>
           </TabsContent>
 
-          {/* Onglet Détails */}
+          {/* ONGLET DÉTAILS */}
           <TabsContent value="details" className="space-y-6">
             <Card>
               <CardHeader>
@@ -429,13 +623,21 @@ export default function CreateRoadTrip() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Durée */}
                   <div className="space-y-1">
-                    <Label htmlFor="duration">Durée (jours) <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="duration">
+                      Durée (jours) <span className="text-red-500">*</span>
+                    </Label>
                     <div className="flex items-center space-x-4">
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => handleChange('duration', Math.max(1, roadtrip.duration - 1))}
+                        onClick={() =>
+                          updateRoadtripField(
+                            "duration",
+                            Math.max(1, roadtrip.duration - 1)
+                          )
+                        }
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
@@ -444,38 +646,56 @@ export default function CreateRoadTrip() {
                         type="number"
                         min="1"
                         value={roadtrip.duration}
-                        onChange={(e) => handleChange('duration', parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          updateRoadtripField(
+                            "duration",
+                            parseInt(e.target.value) || 1
+                          )
+                        }
                         required
                       />
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => handleChange('duration', roadtrip.duration + 1)}
+                        onClick={() =>
+                          updateRoadtripField("duration", roadtrip.duration + 1)
+                        }
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
+
+                  {/* Meilleure saison */}
                   <div className="space-y-1">
-                    <Label htmlFor="bestSeason">Meilleure saison <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="bestSeason">
+                      Meilleure saison <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={roadtrip.bestSeason}
-                      onValueChange={(value) => handleChange('bestSeason', value)}
+                      onValueChange={(value) =>
+                        updateRoadtripField("bestSeason", value)
+                      }
                     >
                       <SelectTrigger id="bestSeason">
                         <SelectValue placeholder="Sélectionner une saison" />
                       </SelectTrigger>
                       <SelectContent>
                         {seasons.map((season) => (
-                          <SelectItem key={season} value={season}>{season}</SelectItem>
+                          <SelectItem key={season} value={season}>
+                            {season}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
+                {/* Budget */}
                 <div className="space-y-1">
-                  <Label htmlFor="budget">Budget estimé (€) <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="budget">
+                    Budget estimé (€) <span className="text-red-500">*</span>
+                  </Label>
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>500 €</span>
@@ -487,7 +707,9 @@ export default function CreateRoadTrip() {
                       max={5000}
                       step={100}
                       value={[roadtrip.budget]}
-                      onValueChange={(value) => handleChange('budget', value[0])}
+                      onValueChange={(value) =>
+                        updateRoadtripField("budget", value[0])
+                      }
                     />
                     <div className="text-center font-medium">
                       {roadtrip.budget} €
@@ -495,24 +717,36 @@ export default function CreateRoadTrip() {
                   </div>
                 </div>
 
+                {/* Tags */}
                 <div className="space-y-3">
-                  <Label>Tags <span className="text-red-500">*</span></Label>
-                  <p className="text-sm text-muted-foreground">Sélectionnez les tags qui correspondent à votre roadtrip (au moins un)</p>
+                  <Label>
+                    Tags <span className="text-red-500">*</span>
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Sélectionnez les tags qui correspondent à votre roadtrip (au
+                    moins un)
+                  </p>
 
+                  {/* Tags sélectionnés */}
                   <div className="flex flex-wrap gap-2">
                     {roadtrip.tags.map((tag) => (
-                      <Badge key={tag} className="cursor-pointer" onClick={() => handleTagSelect(tag)}>
+                      <Badge
+                        key={tag}
+                        className="cursor-pointer"
+                        onClick={() => handleTagToggle(tag)}
+                      >
                         {tag} <X className="ml-1 h-3 w-3" />
                       </Badge>
                     ))}
                   </div>
 
+                  {/* Sélecteur de nouveaux tags */}
                   <Select
                     value={selectedTag}
                     onValueChange={(value) => {
-                      setSelectedTag(value)
+                      setSelectedTag(value);
                       if (value && !roadtrip.tags.includes(value)) {
-                        handleTagSelect(value)
+                        handleTagToggle(value);
                       }
                     }}
                   >
@@ -520,29 +754,18 @@ export default function CreateRoadTrip() {
                       <SelectValue placeholder="Ajouter un tag" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableTags
-                        .filter(tag => !roadtrip.tags.includes(tag))
-                        .map((tag) => (
-                          <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                        ))
-                      }
+                      {availableTagsFiltered.map((tag) => (
+                        <SelectItem key={tag} value={tag}>
+                          {tag}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isPremium"
-                    checked={roadtrip.isPremium}
-                    onCheckedChange={(checked) => handleChange('isPremium', checked)}
-                  />
-                  <Label htmlFor="isPremium">
-                    Contenu premium (réservé aux abonnés)
-                  </Label>
-                </div>
               </CardContent>
+
               <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => navigateTabs('prev')}>
+                <Button variant="outline" onClick={() => navigateToTab("prev")}>
                   <ChevronLeft className="mr-2 h-4 w-4" />
                   Précédent
                 </Button>
@@ -554,7 +777,7 @@ export default function CreateRoadTrip() {
             </Card>
           </TabsContent>
 
-          {/* Onglet Points d'intérêt */}
+          {/*  ONGLET POINTS D'INTÉRÊT  */}
           <TabsContent value="points-of-interest" className="space-y-6">
             <Card>
               <CardHeader>
@@ -567,10 +790,16 @@ export default function CreateRoadTrip() {
                 {/* Points d'intérêt existants */}
                 {roadtrip.pointsOfInterest.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Points d'intérêt ajoutés</h3>
+                    <h3 className="text-lg font-medium">
+                      Points d'intérêt ajoutés (
+                      {roadtrip.pointsOfInterest.length})
+                    </h3>
                     <div className="grid gap-4 md:grid-cols-2">
                       {roadtrip.pointsOfInterest.map((poi, index) => (
-                        <div key={index} className="border rounded-md p-4 space-y-2">
+                        <div
+                          key={index}
+                          className="border rounded-md p-4 space-y-2"
+                        >
                           <div className="flex justify-between items-start">
                             <h4 className="font-medium">{poi.name}</h4>
                             <Button
@@ -581,7 +810,9 @@ export default function CreateRoadTrip() {
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground line-clamp-2">{poi.description}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {poi.description}
+                          </p>
                           <div className="aspect-video bg-muted rounded-md overflow-hidden">
                             <img
                               src={poi.image}
@@ -603,31 +834,13 @@ export default function CreateRoadTrip() {
                   </div>
                 )}
 
-                {/* Ajouter un nouveau point d'intérêt */}
+                {/* Formulaire d'ajout */}
                 <div className="border rounded-md p-4 space-y-4">
-                  <h3 className="text-lg font-medium">Ajouter un point d'intérêt</h3>
+                  <h3 className="text-lg font-medium">
+                    Ajouter un point d'intérêt
+                  </h3>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="poi-name">Nom du lieu <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="poi-name"
-                      placeholder="Ex: Mont Saint-Michel"
-                      value={tempPointOfInterest.name}
-                      onChange={(e) => setTempPointOfInterest(prev => ({ ...prev, name: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="poi-description">Description <span className="text-red-500">*</span></Label>
-                    <Textarea
-                      id="poi-description"
-                      placeholder="Décrivez ce lieu..."
-                      value={tempPointOfInterest.description}
-                      onChange={(e) => setTempPointOfInterest(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-
+                  {/* Image */}
                   <div className="space-y-1">
                     <Label>Image</Label>
                     <div className="aspect-video bg-muted rounded-md overflow-hidden">
@@ -647,17 +860,52 @@ export default function CreateRoadTrip() {
                     </Button>
                   </div>
 
-                  <Button
-                    className="w-full"
-                    onClick={addPointOfInterest}
-                  >
+                  {/* Nom du lieu */}
+                  <div className="space-y-1">
+                    <Label htmlFor="poi-name">
+                      Nom du lieu <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="poi-name"
+                      placeholder="Le nom de lieu (ex: Chamonix-Mont-Blanc)"
+                      value={tempPointOfInterest.name}
+                      onChange={(e) =>
+                        setTempPointOfInterest((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <Label htmlFor="poi-description">
+                      Description <span className="text-red-500">*</span>
+                    </Label>
+                    <Textarea
+                      id="poi-description"
+                      placeholder="Décrivez ce lieu..."
+                      value={tempPointOfInterest.description}
+                      onChange={(e) =>
+                        setTempPointOfInterest((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                      rows={3}
+                    />
+                  </div>
+
+                  <Button className="w-full" onClick={addPointOfInterest}>
                     <Plus className="mr-2 h-4 w-4" />
                     Ajouter ce point d'intérêt
                   </Button>
                 </div>
               </CardContent>
+
               <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => navigateTabs('prev')}>
+                <Button variant="outline" onClick={() => navigateToTab("prev")}>
                   <ChevronLeft className="mr-2 h-4 w-4" />
                   Précédent
                 </Button>
@@ -669,69 +917,128 @@ export default function CreateRoadTrip() {
             </Card>
           </TabsContent>
 
-          {/* Onglet Itinéraire - Amélioré pour avoir un champ par jour */}
+          {/*  ONGLET ITINÉRAIRE  */}
           <TabsContent value="itinerary" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Itinéraire jour par jour</CardTitle>
                 <CardDescription>
-                  Détaillez l'itinéraire de votre roadtrip pour une durée de {roadtrip.duration} jours
+                  Détaillez l'itinéraire de votre roadtrip pour une durée de{" "}
+                  {roadtrip.duration} jours
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Jours d'itinéraire générés dynamiquement */}
+                {/* Indicateur de progression */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Étapes de l'itinéraire</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {itineraryInputs.filter(day => day.title && day.description).length} / {roadtrip.duration} jours complétés
-                    </p>
+                    <h3 className="text-lg font-medium">
+                      Étapes de l'itinéraire
+                    </h3>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium text-primary">
+                        {completionStats.completed}
+                      </span>
+                      {" / "}
+                      <span>{completionStats.total}</span>
+                      {" jours complétés "}
+                      <span className="text-xs">
+                        ({completionStats.percentage}%)
+                      </span>
+                    </div>
                   </div>
-                  
-                  {itineraryInputs.map((day, index) => (
-                    <div key={index} className="border rounded-md p-4 space-y-4">
-                      <h3 className="text-lg font-medium flex items-center">
-                        <span className="flex items-center justify-center bg-primary text-primary-foreground w-8 h-8 rounded-full mr-2">
-                          {day.day}
-                        </span>
-                        Jour {day.day}
-                      </h3>
 
+                  {/* Barre de progression */}
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${completionStats.percentage}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Étapes d'itinéraire */}
+                <div className="space-y-4">
+                  {itineraryInputs.map((step, index) => (
+                    <div
+                      key={index}
+                      className={`border rounded-md p-4 space-y-4 transition-colors ${
+                        step.title.trim() && step.description.trim()
+                          ? "border-green-200 bg-green-50/50"
+                          : "border-gray-200"
+                      }`}
+                    >
+                      {/* En-tête du jour */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium flex items-center">
+                          <span className="flex items-center justify-center bg-primary text-primary-foreground w-8 h-8 rounded-full mr-3">
+                            {step.day}
+                          </span>
+                          Jour {step.day}
+                        </h3>
+
+                        {/* Indicateur de completion */}
+                        {step.title.trim() && step.description.trim() && (
+                          <div className="text-green-600 text-sm font-medium">
+                            ✓ Complété
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Titre de l'étape */}
                       <div className="space-y-1">
-                        <Label htmlFor={`step-title-${index}`}>Titre <span className="text-red-500">*</span></Label>
+                        <Label htmlFor={`step-title-${index}`}>
+                          Titre <span className="text-red-500">*</span>
+                        </Label>
                         <Input
                           id={`step-title-${index}`}
                           placeholder="Ex: Randonnée dans les gorges"
-                          value={day.title}
-                          onChange={(e) => updateItineraryInput(index, "title", e.target.value)}
+                          value={step.title}
+                          onChange={(e) =>
+                            updateItineraryStep(index, "title", e.target.value)
+                          }
                         />
                       </div>
 
+                      {/* Description de l'étape */}
                       <div className="space-y-1">
-                        <Label htmlFor={`step-description-${index}`}>Description <span className="text-red-500">*</span></Label>
+                        <Label htmlFor={`step-description-${index}`}>
+                          Description <span className="text-red-500">*</span>
+                        </Label>
                         <Textarea
                           id={`step-description-${index}`}
                           placeholder="Décrivez l'étape en détail..."
-                          value={day.description}
-                          onChange={(e) => updateItineraryInput(index, "description", e.target.value)}
+                          value={step.description}
+                          onChange={(e) =>
+                            updateItineraryStep(
+                              index,
+                              "description",
+                              e.target.value
+                            )
+                          }
                           rows={3}
                         />
                       </div>
 
+                      {/* Option nuit sur place */}
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id={`overnight-${index}`}
-                          checked={day.overnight}
-                          onCheckedChange={(checked) => updateItineraryInput(index, "overnight", checked)}
+                          checked={step.overnight}
+                          onCheckedChange={(checked) =>
+                            updateItineraryStep(index, "overnight", checked)
+                          }
                         />
-                        <Label htmlFor={`overnight-${index}`}>Nuit sur place</Label>
+                        <Label htmlFor={`overnight-${index}`}>
+                          Nuit sur place
+                        </Label>
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
+
               <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => navigateTabs('prev')}>
+                <Button variant="outline" onClick={() => navigateToTab("prev")}>
                   <ChevronLeft className="mr-2 h-4 w-4" />
                   Précédent
                 </Button>
@@ -743,142 +1050,201 @@ export default function CreateRoadTrip() {
             </Card>
           </TabsContent>
 
-          {/* Onglet Publication */}
+          {/*  ONGLET PUBLICATION  */}
           <TabsContent value="publishing" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Publication</CardTitle>
+                <CardTitle className="text-2xl">
+                  Résumé et publication
+                </CardTitle>
                 <CardDescription>
-                  Finalisez et publiez votre roadtrip
+                  Vérifiez les informations et choisissez les options de
+                  publication
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Aperçu du roadtrip */}
-                <div className="bg-muted p-6 rounded-md">
-                  <h3 className="text-xl font-semibold mb-4">{roadtrip.title || "Titre du roadtrip"}</h3>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <div className="aspect-video bg-background rounded-md overflow-hidden">
-                        <img
-                          src={roadtrip.image}
-                          alt="Image principale du roadtrip"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+              <CardContent className="space-y-8">
+                {/* Résumé visuel du roadtrip */}
+                <div className="bg-muted/50 border rounded-lg p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">
+                      {roadtrip.title || "Titre du roadtrip"}
+                    </h3>
+                    <Badge
+                      variant={roadtrip.isPremium ? "default" : "secondary"}
+                    >
+                      {roadtrip.isPremium ? "Premium" : "Gratuit"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {/* Image de prévisualisation */}
+                    <div className="aspect-video rounded-md overflow-hidden bg-background border">
+                      <img
+                        src={roadtrip.image}
+                        alt="Aperçu"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
 
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground">Destination</h4>
-                        <p>{roadtrip.country}{roadtrip.region ? `, ${roadtrip.region}` : ""}</p>
+                    {/* Informations clés */}
+                    <div className="space-y-3 text-sm">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <span className="font-medium text-foreground">
+                            Destination :
+                          </span>
+                          <p className="text-muted-foreground">
+                            {roadtrip.country}
+                            {roadtrip.region ? `, ${roadtrip.region}` : ""}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">
+                            Durée :
+                          </span>
+                          <p className="text-muted-foreground">
+                            {roadtrip.duration} jours
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <span className="font-medium text-foreground">
+                            Budget :
+                          </span>
+                          <p className="text-muted-foreground">
+                            {roadtrip.budget} €
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">
+                            Saison :
+                          </span>
+                          <p className="text-muted-foreground">
+                            {roadtrip.bestSeason}
+                          </p>
+                        </div>
                       </div>
 
                       <div>
-                        <h4 className="text-sm font-medium text-muted-foreground">Durée</h4>
-                        <p>{roadtrip.duration} jours</p>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground">Budget</h4>
-                        <p>{roadtrip.budget} €</p>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground">Meilleure saison</h4>
-                        <p>{roadtrip.bestSeason}</p>
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground">Type de voyage</h4>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {roadtrip.tags.map(tag => (
-                            <Badge key={tag} variant="secondary">{tag}</Badge>
+                        <span className="font-medium text-foreground">
+                          Tags :
+                        </span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {roadtrip.tags.map((tag) => (
+                            <Badge
+                              key={tag}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {tag}
+                            </Badge>
                           ))}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
-                    <p className="mt-1">{roadtrip.description}</p>
+                  {/* Description */}
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground mb-2">
+                      Description
+                    </h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {roadtrip.description}
+                    </p>
                   </div>
 
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-muted-foreground">Points d'intérêt</h4>
-                    <p className="mt-1">{roadtrip.pointsOfInterest.length} points d'intérêt ajoutés</p>
-                  </div>
-
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-muted-foreground">Itinéraire</h4>
-                    <p className="mt-1">{roadtrip.duration} jours détaillés</p>
-                  </div>
-
-                  {roadtrip.isPremium && (
-                    <div className="mt-4 px-4 py-2 bg-amber-100 text-amber-800 rounded-md">
-                      Ce roadtrip sera marqué comme contenu premium, réservé aux abonnés.
+                  {/* Statistiques */}
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-primary">
+                        {roadtrip.pointsOfInterest.length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Points d'intérêt
+                      </div>
                     </div>
-                  )}
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-primary">
+                        {completionStats.completed}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Étapes d'itinéraire
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="text-lg font-medium">Options de publication</h3>
+                {/* Options de publication */}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-medium">
+                    Options de publication
+                  </h4>
 
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
                       <Checkbox
-                        id="publish-now"
-                        checked={roadtrip.isPublished}
-                        onCheckedChange={(checked) => handleChange('isPublished', checked)}
+                        id="isPremium"
+                        checked={roadtrip.isPremium}
+                        onCheckedChange={(checked) =>
+                          updateRoadtripField("isPremium", Boolean(checked))
+                        }
                       />
                       <div>
-                        <Label htmlFor="publish-now" className="font-medium">
-                          Publier immédiatement
+                        <Label
+                          htmlFor="isPremium"
+                          className="text-sm font-medium"
+                        >
+                          Contenu Premium
                         </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Le roadtrip sera visible par tous les utilisateurs dès sa création.
+                        <p className="text-xs text-muted-foreground">
+                          Réservé aux utilisateurs avec abonnement
                         </p>
                       </div>
                     </div>
 
-                    {!roadtrip.isPublished && (
-                      <div className="pl-6">
-                        <p className="text-sm text-muted-foreground">
-                          Votre roadtrip sera enregistré comme brouillon et ne sera visible que par vous.
-                          Vous pourrez le publier ultérieurement depuis votre dashboard.
-                        </p>
+                    {roadtrip.isPremium && (
+                      <div className="text-sm text-amber-700 bg-amber-100 px-3 py-2 rounded-md border border-amber-200">
+                        🔒 Accès Premium requis
                       </div>
                     )}
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => navigateTabs('prev')}>
+
+              {/* Actions finales */}
+              <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6">
+                <Button variant="outline" onClick={() => navigateToTab("prev")}>
                   <ChevronLeft className="mr-2 h-4 w-4" />
                   Précédent
                 </Button>
-                <div className="space-x-2">
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     onClick={() => handleSaveRoadtrip(false)}
                     disabled={isSaving}
+                    className="min-w-[200px]"
                   >
-                    {isSaving ?
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> :
+                    {isSaving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
                       <Save className="mr-2 h-4 w-4" />
-                    }
+                    )}
                     Enregistrer comme brouillon
                   </Button>
                   <Button
                     onClick={() => handleSaveRoadtrip(true)}
                     disabled={isSaving}
+                    className="min-w-[150px]"
                   >
-                    {isSaving ?
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> :
-                      null
-                    }
-                    Publier
+                    {isSaving && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Publier maintenant
                   </Button>
                 </div>
               </CardFooter>
@@ -887,5 +1253,5 @@ export default function CreateRoadTrip() {
         </Tabs>
       </div>
     </div>
-  )
+  );
 }

@@ -4,13 +4,10 @@ const OAUTH_URL =
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "https://api.example.com";
 
 export const AuthService = {
-  // ======================
-  // 🔐 Authentification de base
-  // ======================
 
   async register(email, password, firstName, lastName) {
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/register`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, firstName, lastName }),
@@ -28,7 +25,7 @@ export const AuthService = {
 
   async login(email, password) {
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/login`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -54,7 +51,7 @@ export const AuthService = {
       const token = this.getAuthToken();
 
       if (token) {
-        await fetch(`${API_GATEWAY_URL}/auth/logout`, {
+        await fetch(`${API_GATEWAY_URL}/api/auth/logout`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         }).catch((err) => console.warn("Erreur lors de la déconnexion:", err));
@@ -65,13 +62,11 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // 🎫 Gestion des tokens
-  // ======================
+  // Gestion des tokens
 
   async verifyToken(token) {
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/verify-token`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/verify-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -91,7 +86,7 @@ export const AuthService = {
     if (!refreshToken) return null;
 
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/refresh-token`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/refresh-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -108,13 +103,25 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // ✅ Vérification de compte
-  // ======================
+  setAuthTokens(tokens) {
+    if (tokens.accessToken) {
+      localStorage.setItem("auth_token", tokens.accessToken);
+      console.log("✅ Access token mis à jour");
+    }
+    if (tokens.refreshToken) {
+      localStorage.setItem("refresh_token", tokens.refreshToken);
+      console.log("✅ Refresh token mis à jour");
+    }
+    
+    localStorage.removeItem("userRole");
+    console.log("🔄 Cache rôle nettoyé - sera rechargé automatiquement");
+  },
+
+  // Vérification de compte
 
   async verifyAccountToken(token) {
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/verify-account`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/verify-account`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -131,7 +138,7 @@ export const AuthService = {
         success: true,
         message: data.message || "Votre compte a bien été vérifié.",
       };
-    } catch (err: any) {
+    } catch (err) {
       return {
         success: false,
         message: err.message || "Une erreur est survenue.",
@@ -139,14 +146,12 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // 🔑 Mot de passe
-  // ======================
+  // Mot de passe
 
   async initiatePasswordReset(email) {
     try {
       const res = await fetch(
-        `${API_GATEWAY_URL}/auth/initiate-password-reset`,
+        `${API_GATEWAY_URL}/api/auth/initiate-password-reset`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -170,7 +175,7 @@ export const AuthService = {
   async initiatePasswordResetBySMS(phoneNumber) {
     try {
       const res = await fetch(
-        `${API_GATEWAY_URL}/auth/initiate-password-reset-sms`,
+        `${API_GATEWAY_URL}/api/auth/initiate-password-reset-sms`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -199,7 +204,7 @@ export const AuthService = {
       );
     }
 
-    const res = await fetch(`${API_GATEWAY_URL}/auth/reset-password`, {
+    const res = await fetch(`${API_GATEWAY_URL}/api/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, resetCode, newPassword }),
@@ -216,7 +221,7 @@ export const AuthService = {
     if (!token) throw new Error("Non authentifié");
 
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/change-password`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/change-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -237,16 +242,14 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // 👤 Profil utilisateur
-  // ======================
+  // Profil utilisateur
 
   async getProfile() {
     const token = this.getAuthToken();
     if (!token) return null;
 
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/profile`, {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -268,7 +271,7 @@ export const AuthService = {
     if (!token) throw new Error("Non authentifié");
 
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/profile`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -289,9 +292,7 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // 🌐 Connexion sociale
-  // ======================
+  // Connexion sociale
 
   async socialLogin(provider) {
     try {
@@ -312,16 +313,14 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // ❌ Suppression de compte
-  // ======================
+  // Suppression de compte
 
   async deleteAccount() {
     const token = this.getAuthToken();
     if (!token) throw new Error("Non authentifié");
 
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/auth/account`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/auth/account`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -334,7 +333,6 @@ export const AuthService = {
         );
       }
 
-      // Nettoyage local après suppression
       this.clearAuthStorage();
 
       return await res.json();
@@ -344,9 +342,7 @@ export const AuthService = {
     }
   },
 
-  // ======================
-  // 🧠 Vérification session + rôle
-  // ======================
+  // Vérification session + rôle
 
   async getAuthHeaders() {
     const token =
@@ -373,18 +369,15 @@ export const AuthService = {
     return true;
   },
 
-  async checkAuthenticationAndRole(expectedRoles: string | string[]) {
+  async checkAuthenticationAndRole() {
     const isAuthenticated = await this.checkAuthentication();
-    if (!isAuthenticated) return false;
-
-    const role = await this.getUserRoleAsync();
-    if (!role) return false;
-
-    if (Array.isArray(expectedRoles)) {
-      return expectedRoles.includes(role);
+    if (!isAuthenticated) {
+      return { isAuthenticated: false, role: null };
     }
 
-    return role === expectedRoles;
+    const role = await this.getUserRoleAsync();
+
+    return { isAuthenticated: true, role };
   },
 
   getAuthToken() {
